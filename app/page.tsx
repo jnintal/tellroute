@@ -5,7 +5,7 @@ export default function Home() {
         <div className="text-2xl font-bold text-white">Route</div>
         <div className="flex gap-4">
           <a 
-            href="https://hopeful-mudfish-95.accounts.dev/sign-in?redirect_url=http://localhost:3001/dashboard" 
+            href="https://accounts.tellroute.com/sign-in?redirect_url=https://tellroute.com/dashboard" 
             className="px-6 py-2 text-gray-300 hover:text-white transition"
           >
             Dashboard Login
