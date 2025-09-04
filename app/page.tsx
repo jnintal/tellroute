@@ -44,7 +44,7 @@ export default function Home() {
           </div>
           
           <div className="flex gap-4">
-            <a href="https://accounts.tellroute.com/sign-in?redirect_url=https://tellroute.com/dashboard" 
+            <a href="/sign-in" 
                className="px-6 py-2 text-gray-300 hover:text-white transition-all duration-300 hover:scale-105">
               Dashboard Login
             </a>
