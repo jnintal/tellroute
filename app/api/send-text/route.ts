@@ -19,7 +19,8 @@ export async function POST(req: NextRequest) {
     const msg = await client.messages.create({ from, to: recipient, body });
     
     return Response.json({ ok: true, sid: msg.sid });
-  } catch (error: any) {
-    return Response.json({ error: error.message || 'Server error' }, { status: 500 });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Server error';
+    return Response.json({ error: errorMessage }, { status: 500 });
   }
 }
