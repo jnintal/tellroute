@@ -8,7 +8,7 @@ export default function DashboardPage() {
   const { isLoaded, userId } = useAuth();
   const router = useRouter();
   const [selectedPeriod, setSelectedPeriod] = useState('today');
-  const [selectedCall, setSelectedCall] = useState<any>(null);
+  const [selectedCall, setSelectedCall] = useState<{ id: number; phone: string; time: string; duration: string; type: string; recording: string } | null>(null);
 
   useEffect(() => {
     if (isLoaded && !userId) {
@@ -71,7 +71,7 @@ export default function DashboardPage() {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Welcome back!</h1>
-          <p className="text-gray-400">Here's what's happening with your calls today.</p>
+          <p className="text-gray-400">Here&apos;s what&apos;s happening with your calls today.</p>
         </div>
 
         {/* Time Period Selector */}
@@ -225,11 +225,11 @@ export default function DashboardPage() {
                   </div>
                   <div>
                     <p className="text-xs text-green-400">Customer</p>
-                    <p className="text-sm">Hi, I'd like to make a reservation for tonight.</p>
+                    <p className="text-sm">Hi, I&apos;d like to make a reservation for tonight.</p>
                   </div>
                   <div>
                     <p className="text-xs text-blue-400">AI Assistant</p>
-                    <p className="text-sm">Of course! I'd be happy to help you with a reservation. Let me send you our booking link.</p>
+                    <p className="text-sm">Of course! I&apos;d be happy to help you with a reservation. Let me send you our booking link.</p>
                   </div>
                 </div>
               </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 
 export default function Home() {
   const [mounted, setMounted] = useState(false);
@@ -44,10 +45,10 @@ export default function Home() {
           </div>
           
           <div className="flex gap-4">
-            <a href="/sign-in" 
+            <Link href="/sign-in" 
                className="px-6 py-2 text-gray-300 hover:text-white transition-all duration-300 hover:scale-105">
               Dashboard Login
-            </a>
+            </Link>
             <a href="mailto:contact@tellroute.com" 
                className="px-6 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-blue-500/25">
               Contact Sales
