@@ -1,57 +1,65 @@
+// app/api/retell-webhook/route.ts
 import { NextRequest } from 'next/server';
-
-// Define the Retell webhook types
-interface RetellCallData {
-  call_id: string;
-  agent_id: string;
-  from_number: string;
-  to_number: string;
-  direction: 'inbound' | 'outbound';
-  call_status: 'ongoing' | 'ended' | 'error';
-  start_timestamp: number;
-  end_timestamp?: number;
-  duration_seconds?: number;
-  recording_url?: string;
-  transcript?: Array<{
-    speaker: 'agent' | 'user';
-    text: string;
-    timestamp: number;
-  }>;
-  call_analysis?: {
-    summary: string;
-    sentiment: string;
-    action_items: string[];
-  };
-}
+import { supabase } from '@/lib/supabase';
 
 export async function POST(req: NextRequest) {
   try {
-    // Verify the webhook is from Retell (you'll need to add a secret)
-    const retellSignature = req.headers.get('x-retell-signature');
-    if (retellSignature !== process.env.RETELL_WEBHOOK_SECRET) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    const data = await req.json();
+    
+    console.log(`Received ${data.event} event for call ${data.call_id}`);
+
+    // Handle different event types
+    switch (data.event) {
+      case 'call_started':
+        // Log that a call started (optional)
+        console.log('Call started:', data.call_id);
+        break;
+        
+      case 'call_ended':
+        // This is the main event with all the data
+        const { error } = await supabase
+          .from('calls')
+          .insert({
+            call_id: data.call_id,
+            agent_id: data.agent_id,
+            from_number: data.from_number,
+            to_number: data.to_number,
+            duration: data.call.end_timestamp - data.call.start_timestamp,
+            transcript: data.call.transcript,
+            recording_url: data.call.recording_url,
+            disconnect_reason: data.call.disconnection_reason,
+            created_at: new Date(data.call.start_timestamp),
+          });
+          
+        if (error) {
+          console.error('Failed to save call:', error);
+        } else {
+          console.log('Call saved successfully');
+        }
+        break;
+        
+      case 'call_analyzed':
+        // Update the call with analysis data
+        const { error: updateError } = await supabase
+          .from('calls')
+          .update({
+            summary: data.call_analysis.call_summary,
+            sentiment: data.call_analysis.user_sentiment,
+            agent_sentiment: data.call_analysis.agent_sentiment,
+            analysis: data.call_analysis,
+          })
+          .eq('call_id', data.call_id);
+          
+        if (updateError) {
+          console.error('Failed to update analysis:', updateError);
+        }
+        break;
+        
+      default:
+        console.log('Unknown event type:', data.event);
     }
 
-    const data: RetellCallData = await req.json();
-    
-    // Store in your database (example with Supabase)
-    // const { error } = await supabase
-    //   .from('calls')
-    //   .insert({
-    //     call_id: data.call_id,
-    //     agent_id: data.agent_id,
-    //     from_number: data.from_number,
-    //     duration: data.duration_seconds,
-    //     recording_url: data.recording_url,
-    //     transcript: data.transcript,
-    //     summary: data.call_analysis?.summary,
-    //     created_at: new Date(data.start_timestamp * 1000),
-    //   });
-
-    // For now, just log it
-    console.log('Received call data:', data);
-    
-    return Response.json({ success: true });
+    return Response.json({ received: true });
   } catch (error) {
     console.error('Webhook error:', error);
     return Response.json({ error: 'Server error' }, { status: 500 });
