@@ -2,7 +2,6 @@
 import { NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-// Initialize Supabase client
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -12,26 +11,32 @@ export async function POST(req: NextRequest) {
   try {
     const data = await req.json();
     
-    console.log(`📞 Received ${data.event} event for call ${data.call_id}`);
-
+    // LOG THE ENTIRE PAYLOAD TO SEE STRUCTURE
+    console.log('📍 FULL WEBHOOK PAYLOAD:', JSON.stringify(data, null, 2));
+    console.log('📍 Event type:', data.event);
+    console.log('📍 Call ID:', data.call?.id || data.call_id || 'NO CALL ID FOUND');
+    
     // Handle different event types
     switch (data.event) {
       case 'call_started':
-        console.log('Call started:', data.call_id);
+        console.log('📞 Call started event received');
+        // Just log for now, don't save
         break;
         
       case 'call_ended':
-        // This is the main event with all the call data
-        console.log('Processing call_ended event...');
+        console.log('📞 Processing call_ended event...');
         
-        // Determine which phone number to look up
-        // For inbound calls: to_number is your Retell number
-        // For outbound calls: from_number is your Retell number
-        const retellPhoneNumber = data.direction === 'inbound' 
-          ? data.to_number 
-          : data.from_number;
+        // Try different possible field names for the phone numbers
+        const toNumber = data.to_number || data.to || data.call?.to_number || data.call?.to;
+        const fromNumber = data.from_number || data.from || data.call?.from_number || data.call?.from;
+        const callId = data.call?.id || data.call_id || data.id;
         
-        console.log(`Looking up user for phone: ${retellPhoneNumber}`);
+        console.log(`📍 Phone numbers - From: ${fromNumber}, To: ${toNumber}`);
+        
+        // Determine which is the Retell number based on direction
+        const retellPhoneNumber = data.direction === 'inbound' ? toNumber : fromNumber;
+        
+        console.log(`📍 Looking up user for Retell phone: ${retellPhoneNumber}`);
         
         // Find which user owns this phone number
         const { data: phoneData, error: phoneError } = await supabase
@@ -42,62 +47,59 @@ export async function POST(req: NextRequest) {
           .single();
         
         if (phoneError) {
-          console.log('No user found for this phone number:', phoneError);
+          console.log('❌ No user found for this phone number:', phoneError);
+          console.log('📍 Checking user_phone_numbers table for any entries...');
+          
+          const { data: allPhones } = await supabase
+            .from('user_phone_numbers')
+            .select('*');
+          console.log('📍 All phone numbers in database:', allPhones);
         } else {
-          console.log(`Found user: ${phoneData.email}`);
+          console.log(`✅ Found user: ${phoneData.email} (${phoneData.user_id})`);
         }
         
-        // Calculate duration in seconds
-        const duration = data.end_timestamp 
-          ? Math.floor((data.end_timestamp - data.start_timestamp) / 1000)
-          : 0;
+        // Calculate duration
+        const startTime = data.start_timestamp || data.call?.start_timestamp;
+        const endTime = data.end_timestamp || data.call?.end_timestamp;
+        const duration = startTime && endTime ? Math.floor((endTime - startTime) / 1000) : 0;
         
-        // Save the call with the user_id
+        console.log(`📍 Duration calculation: ${duration} seconds`);
+        
+        // Prepare the call record
+        const callRecord = {
+          call_id: callId,
+          agent_id: data.agent_id || data.call?.agent_id || null,
+          user_id: phoneData?.user_id || null,
+          from_number: fromNumber,
+          to_number: toNumber,
+          duration: duration,
+          transcript: data.transcript || data.call?.transcript || [],
+          recording_url: data.recording_url || data.call?.recording_url || null,
+          disconnect_reason: data.disconnection_reason || data.call?.disconnection_reason || null,
+          created_at: startTime ? new Date(startTime).toISOString() : new Date().toISOString(),
+        };
+        
+        console.log('📍 Call record to save:', callRecord);
+        
+        // Save the call
         const { error: insertError } = await supabase
           .from('calls')
-          .insert({
-            call_id: data.call_id,
-            agent_id: data.agent_id,
-            user_id: phoneData?.user_id || null, // Link to the user!
-            from_number: data.from_number,
-            to_number: data.to_number,
-            duration: duration,
-            transcript: data.transcript || [],
-            recording_url: data.recording_url,
-            disconnect_reason: data.disconnection_reason,
-            created_at: new Date(data.start_timestamp * 1000).toISOString(),
-          });
+          .insert(callRecord);
           
         if (insertError) {
           console.error('❌ Failed to save call:', insertError);
         } else {
-          console.log('✅ Call saved successfully with user assignment');
+          console.log('✅ Call saved successfully!');
         }
         break;
         
       case 'call_analyzed':
-        // Update the call with analysis data
-        console.log('Processing call_analyzed event...');
-        
-        const { error: updateError } = await supabase
-          .from('calls')
-          .update({
-            summary: data.call_analysis?.call_summary,
-            sentiment: data.call_analysis?.user_sentiment,
-            agent_sentiment: data.call_analysis?.agent_sentiment,
-            analysis: data.call_analysis,
-          })
-          .eq('call_id', data.call_id);
-          
-        if (updateError) {
-          console.error('❌ Failed to update analysis:', updateError);
-        } else {
-          console.log('✅ Analysis updated successfully');
-        }
+        console.log('📞 Call analyzed event received');
+        // We'll handle this later
         break;
         
       default:
-        console.log('Unknown event type:', data.event);
+        console.log('❓ Unknown event type:', data.event);
     }
 
     return Response.json({ received: true });
