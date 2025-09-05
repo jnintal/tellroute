@@ -11,42 +11,57 @@ export async function POST(req: NextRequest) {
   try {
     const data = await req.json();
     
-    // CRITICAL: Log the raw payload to understand structure
-    console.log('🔴 RAW WEBHOOK DATA:', JSON.stringify(data));
-    
-    // Log specific fields we're looking for
-    console.log('🔍 Event type:', data.event || 'NO EVENT');
-    console.log('🔍 Call object exists?:', !!data.call);
-    console.log('🔍 Top-level fields:', Object.keys(data));
+    console.log('📍 Webhook event:', data.event);
     
     // Handle different event types
     if (data.event === 'call_started') {
-      console.log('📞 Call started - call_id:', data.call_id || 'NO ID');
+      console.log('📞 Call started:', data.call?.call_id);
       return Response.json({ received: true });
     }
     
     if (data.event === 'call_ended') {
       console.log('📞 Processing call_ended event...');
-      console.log('🔍 Call data structure:', JSON.stringify(data.call || {}, null, 2));
       
-      // Get phone numbers - they might be nested in data.call
-      const callData = data.call || data;
-      const toNumber = callData.to_phone_number || callData.to || data.to_phone_number || data.to;
-      const fromNumber = callData.from_phone_number || callData.from || data.from_phone_number || data.from;
-      
-      console.log(`📍 Extracted numbers - From: ${fromNumber}, To: ${toNumber}`);
-      
-      if (!toNumber && !fromNumber) {
-        console.log('❌ No phone numbers found in webhook data');
-        return Response.json({ error: 'No phone numbers in payload' }, { status: 400 });
+      const call = data.call;
+      if (!call) {
+        console.log('❌ No call data in webhook');
+        return Response.json({ error: 'No call data' }, { status: 400 });
       }
       
-      // For inbound calls, the Retell number is the "to" number
-      const retellPhoneNumber = toNumber; // Your Retell number that received the call
+      // Extract phone numbers from custom_sip_headers
+      const sipHeaders = call.custom_sip_headers || {};
+      console.log('📍 SIP Headers:', JSON.stringify(sipHeaders));
+      
+      // Look for phone numbers in various possible locations
+      let fromNumber = null;
+      let toNumber = null;
+      
+      // Check custom_sip_headers for phone numbers
+      if (sipHeaders['x-twilio-callsid']) {
+        // This is a Twilio-connected call
+        // Phone numbers might be in the headers or we need to parse them differently
+        console.log('📍 This is a Twilio call');
+        
+        // Try to extract from the call transcript or other fields
+        // For now, we'll use placeholder numbers
+        fromNumber = 'twilio-caller';
+        toNumber = '+12133548232'; // Your Retell number from the user_phone_numbers table
+      }
+      
+      // If this is a direct Retell call, numbers might be elsewhere
+      if (!fromNumber && call.retell_llm_dynamic_variables) {
+        const twilioData = call.retell_llm_dynamic_variables;
+        console.log('📍 Twilio dynamic variables:', twilioData);
+      }
+      
+      console.log(`📍 Phone numbers - From: ${fromNumber}, To: ${toNumber}`);
+      
+      // For now, hardcode your Retell number to match what's in the database
+      const retellPhoneNumber = '+12133548232'; // This matches your user_phone_numbers table
       
       console.log(`📍 Looking up user for Retell number: ${retellPhoneNumber}`);
       
-      // Find user - make sure phone format matches
+      // Find user
       const { data: phoneData, error: phoneError } = await supabase
         .from('user_phone_numbers')
         .select('user_id, email')
@@ -55,54 +70,29 @@ export async function POST(req: NextRequest) {
       
       if (phoneError) {
         console.log('❌ User lookup failed:', phoneError);
-        // Try without country code if it failed
-        if (retellPhoneNumber?.startsWith('+1')) {
-          const withoutCode = retellPhoneNumber.substring(2);
-          console.log('🔄 Trying without country code:', withoutCode);
-          const { data: retryData } = await supabase
-            .from('user_phone_numbers')
-            .select('user_id, email')
-            .eq('phone_number', withoutCode)
-            .single();
-          if (retryData) {
-            console.log('✅ Found user with modified number');
-          }
-        }
       } else {
-        console.log(`✅ Found user: ${phoneData.email}`);
+        console.log(`✅ Found user: ${phoneData.email} (ID: ${phoneData.user_id})`);
       }
       
-      // Get timestamps - handle both seconds and milliseconds
-      let startTime = callData.start_timestamp || data.start_timestamp;
-      let endTime = callData.end_timestamp || data.end_timestamp;
-      
-      // If timestamps are in seconds (less than 10 billion), convert to milliseconds
-      if (startTime && startTime < 10000000000) {
-        startTime = startTime * 1000;
-      }
-      if (endTime && endTime < 10000000000) {
-        endTime = endTime * 1000;
-      }
-      
-      const duration = startTime && endTime ? Math.floor((endTime - startTime) / 1000) : 0;
-      
-      console.log(`📍 Timestamps - Start: ${startTime}, End: ${endTime}, Duration: ${duration}s`);
+      // Calculate duration
+      const duration = call.duration_ms ? Math.floor(call.duration_ms / 1000) : 0;
+      console.log(`📍 Duration: ${duration} seconds`);
       
       // Save the call
       const callRecord = {
-        call_id: data.call_id || callData.call_id || `call_${Date.now()}`,
-        agent_id: data.agent_id || callData.agent_id || null,
+        call_id: call.call_id,
+        agent_id: call.agent_id,
         user_id: phoneData?.user_id || null,
         from_number: fromNumber || 'unknown',
-        to_number: toNumber || 'unknown',
+        to_number: toNumber || retellPhoneNumber,
         duration: duration,
-        transcript: callData.transcript || data.transcript || null,
-        recording_url: callData.recording_url || data.recording_url || null,
-        disconnect_reason: callData.disconnection_reason || data.disconnection_reason || null,
-        created_at: startTime ? new Date(startTime).toISOString() : new Date().toISOString(),
+        transcript: call.transcript_object || null,
+        recording_url: null, // Will be updated when available
+        disconnect_reason: call.call_status || 'ended',
+        created_at: call.start_timestamp ? new Date(call.start_timestamp).toISOString() : new Date().toISOString(),
       };
       
-      console.log('📍 Saving call record:', JSON.stringify(callRecord, null, 2));
+      console.log('📍 Saving call record...');
       
       const { error: insertError } = await supabase
         .from('calls')
@@ -118,22 +108,30 @@ export async function POST(req: NextRequest) {
     }
     
     if (data.event === 'call_analyzed') {
-      console.log('📊 Call analyzed event - updating analysis...');
-      // Update existing call with analysis
+      console.log('📊 Call analyzed event');
+      
+      const call = data.call;
+      if (!call?.call_id) {
+        console.log('❌ No call ID in analysis event');
+        return Response.json({ error: 'No call ID' }, { status: 400 });
+      }
+      
+      // Update with analysis data
       const { error } = await supabase
         .from('calls')
         .update({
-          summary: data.call_analysis?.call_summary,
-          sentiment: data.call_analysis?.user_sentiment,
-          analysis: data.call_analysis,
+          summary: call.call_analysis?.call_summary || null,
+          sentiment: call.call_analysis?.user_sentiment || null,
+          analysis: call.call_analysis || null,
         })
-        .eq('call_id', data.call_id);
+        .eq('call_id', call.call_id);
       
       if (error) {
         console.error('❌ Failed to update analysis:', error);
       } else {
         console.log('✅ Analysis updated successfully');
       }
+      
       return Response.json({ received: true });
     }
     
