@@ -8,7 +8,14 @@ export default function DashboardPage() {
   const { isLoaded, userId } = useAuth();
   const router = useRouter();
   const [selectedPeriod, setSelectedPeriod] = useState('today');
-  const [selectedCall, setSelectedCall] = useState<{ id: number; phone: string; time: string; duration: string; type: string; recording: string } | null>(null);
+  const [selectedCall, setSelectedCall] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [calls, setCalls] = useState<any[]>([]);
+  const [stats, setStats] = useState({
+    totalCalls: 0,
+    avgDuration: '0:00',
+    smsCount: 0,
+  });
 
   useEffect(() => {
     if (isLoaded && !userId) {
@@ -16,27 +23,63 @@ export default function DashboardPage() {
     }
   }, [isLoaded, userId, router]);
 
+  // Fetch real data from API
+  useEffect(() => {
+    if (userId) {
+      fetchCalls();
+    }
+  }, [userId, selectedPeriod]);
+
+  const fetchCalls = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`/api/calls?period=${selectedPeriod}`);
+      const data = await response.json();
+      
+      if (response.ok) {
+        setCalls(data.calls || []);
+        
+        // Calculate stats from real data
+        const totalCalls = data.calls?.length || 0;
+        const totalDuration = data.calls?.reduce((sum: number, call: any) => sum + (call.duration || 0), 0) || 0;
+        const avgDurationSeconds = totalCalls > 0 ? Math.floor(totalDuration / totalCalls) : 0;
+        const avgDurationFormatted = `${Math.floor(avgDurationSeconds / 60)}:${(avgDurationSeconds % 60).toString().padStart(2, '0')}`;
+        
+        setStats({
+          totalCalls,
+          avgDuration: avgDurationFormatted,
+          smsCount: 0, // You can add SMS tracking later
+        });
+      }
+    } catch (error) {
+      console.error('Failed to fetch calls:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatTimeAgo = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+    
+    if (seconds < 60) return `${seconds} seconds ago`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)} mins ago`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours ago`;
+    return `${Math.floor(seconds / 86400)} days ago`;
+  };
+
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
   if (!isLoaded || !userId) {
     return <div className="min-h-screen bg-gray-900 flex items-center justify-center">
       <div className="text-white">Loading...</div>
     </div>;
   }
-
-  // Mock data - replace with real data from your backend
-  const stats = {
-    totalCalls: 156,
-    avgDuration: '2:45',
-    smsCount: 43,
-  };
-
-  // Mock call data
-  const calls = [
-    { id: 1, phone: '+1 (555) 101-1001', time: '5 mins ago', duration: '2:15', type: 'Reservation inquiry', recording: '/audio/call1.mp3' },
-    { id: 2, phone: '+1 (555) 102-1002', time: '15 mins ago', duration: '1:45', type: 'Hours question', recording: '/audio/call2.mp3' },
-    { id: 3, phone: '+1 (555) 103-1003', time: '30 mins ago', duration: '3:20', type: 'Menu inquiry', recording: '/audio/call3.mp3' },
-    { id: 4, phone: '+1 (555) 104-1004', time: '1 hour ago', duration: '2:55', type: 'Takeout order', recording: '/audio/call4.mp3' },
-    { id: 5, phone: '+1 (555) 105-1005', time: '2 hours ago', duration: '4:10', type: 'Catering inquiry', recording: '/audio/call5.mp3' },
-  ];
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
@@ -54,7 +97,10 @@ export default function DashboardPage() {
             </div>
             
             <div className="flex items-center gap-4">
-              <button className="flex items-center gap-2 hover:bg-gray-700 px-3 py-2 rounded-lg transition">
+              <button 
+                onClick={() => router.push('/account')}
+                className="flex items-center gap-2 hover:bg-gray-700 px-3 py-2 rounded-lg transition"
+              >
                 <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full"></div>
                 <span className="text-sm">Account</span>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -76,7 +122,7 @@ export default function DashboardPage() {
 
         {/* Time Period Selector */}
         <div className="flex gap-2 mb-6">
-          {['today', 'week', 'month'].map((period) => (
+          {['today', 'week', 'month', 'all'].map((period) => (
             <button
               key={period}
               onClick={() => setSelectedPeriod(period)}
@@ -86,12 +132,12 @@ export default function DashboardPage() {
                   : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
               }`}
             >
-              {period.charAt(0).toUpperCase() + period.slice(1)}
+              {period === 'all' ? 'All Time' : period.charAt(0).toUpperCase() + period.slice(1)}
             </button>
           ))}
         </div>
 
-        {/* Stats Grid - Simplified */}
+        {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           <div className="bg-gray-800/50 backdrop-blur-lg border border-gray-700 rounded-xl p-6">
             <div className="flex items-center justify-between mb-2">
@@ -101,7 +147,11 @@ export default function DashboardPage() {
               </svg>
             </div>
             <div className="text-2xl font-bold">{stats.totalCalls}</div>
-            <div className="text-xs text-green-400 mt-1">↑ 12% from yesterday</div>
+            <div className="text-xs text-gray-400 mt-1">
+              {selectedPeriod === 'today' ? 'Today' : 
+               selectedPeriod === 'week' ? 'This week' : 
+               selectedPeriod === 'month' ? 'This month' : 'All time'}
+            </div>
           </div>
 
           <div className="bg-gray-800/50 backdrop-blur-lg border border-gray-700 rounded-xl p-6">
@@ -133,39 +183,43 @@ export default function DashboardPage() {
             <h2 className="text-lg font-semibold">Call History</h2>
           </div>
           
-          <div className="divide-y divide-gray-700">
-            {calls.map((call) => (
-              <div 
-                key={call.id} 
-                onClick={() => setSelectedCall(call)}
-                className="p-4 hover:bg-gray-700/50 transition cursor-pointer"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-blue-500/20 rounded-full flex items-center justify-center">
-                      <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                      </svg>
+          {loading ? (
+            <div className="p-8 text-center text-gray-400">Loading calls...</div>
+          ) : calls.length === 0 ? (
+            <div className="p-8 text-center text-gray-400">
+              No calls found for {selectedPeriod === 'all' ? 'all time' : `${selectedPeriod}`}
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-700">
+              {calls.map((call) => (
+                <div 
+                  key={call.call_id} 
+                  onClick={() => setSelectedCall(call)}
+                  className="p-4 hover:bg-gray-700/50 transition cursor-pointer"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 bg-blue-500/20 rounded-full flex items-center justify-center">
+                        <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <div className="font-medium">{call.from_number || 'Unknown'}</div>
+                        <div className="text-sm text-gray-400">
+                          {call.summary || call.disconnect_reason || 'Call completed'}
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <div className="font-medium">{call.phone}</div>
-                      <div className="text-sm text-gray-400">{call.type}</div>
+                    <div className="text-right">
+                      <div className="text-sm text-gray-400">{formatTimeAgo(call.created_at)}</div>
+                      <div className="text-sm font-medium">{formatDuration(call.duration || 0)}</div>
                     </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm text-gray-400">{call.time}</div>
-                    <div className="text-sm font-medium">{call.duration}</div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-          
-          <div className="p-4 border-t border-gray-700 text-center">
-            <button className="text-blue-400 hover:text-blue-300 text-sm font-medium">
-              Load more calls
-            </button>
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </main>
 
@@ -189,60 +243,45 @@ export default function DashboardPage() {
               {/* Call Info */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm text-gray-400">Phone Number</p>
-                  <p className="font-medium">{selectedCall.phone}</p>
+                  <p className="text-sm text-gray-400">Call ID</p>
+                  <p className="font-medium text-xs">{selectedCall.call_id}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-400">Call Duration</p>
-                  <p className="font-medium">{selectedCall.duration}</p>
+                  <p className="text-sm text-gray-400">Duration</p>
+                  <p className="font-medium">{formatDuration(selectedCall.duration || 0)}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-400">Time</p>
-                  <p className="font-medium">{selectedCall.time}</p>
+                  <p className="text-sm text-gray-400">From</p>
+                  <p className="font-medium">{selectedCall.from_number || 'Unknown'}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-400">Type</p>
-                  <p className="font-medium">{selectedCall.type}</p>
+                  <p className="text-sm text-gray-400">To</p>
+                  <p className="font-medium">{selectedCall.to_number}</p>
                 </div>
-              </div>
-
-              {/* Audio Player */}
-              <div className="bg-gray-700/50 rounded-lg p-4">
-                <p className="text-sm text-gray-400 mb-2">Recording</p>
-                <audio controls className="w-full">
-                  <source src={selectedCall.recording} type="audio/mpeg" />
-                  Your browser does not support the audio element.
-                </audio>
               </div>
 
               {/* Transcript */}
-              <div className="bg-gray-700/50 rounded-lg p-4">
-                <p className="text-sm text-gray-400 mb-2">Transcript</p>
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-xs text-blue-400">AI Assistant</p>
-                    <p className="text-sm">Hello, thank you for calling. How can I help you today?</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-green-400">Customer</p>
-                    <p className="text-sm">Hi, I&apos;d like to make a reservation for tonight.</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-blue-400">AI Assistant</p>
-                    <p className="text-sm">Of course! I&apos;d be happy to help you with a reservation. Let me send you our booking link.</p>
+              {selectedCall.transcript && (
+                <div className="bg-gray-700/50 rounded-lg p-4">
+                  <p className="text-sm text-gray-400 mb-2">Transcript</p>
+                  <div className="space-y-3 max-h-96 overflow-y-auto">
+                    {selectedCall.transcript.map((item: any, index: number) => (
+                      <div key={index}>
+                        <p className="text-xs text-blue-400">{item.role === 'agent' ? 'AI Assistant' : 'Customer'}</p>
+                        <p className="text-sm">{item.content || item.words?.map((w: any) => w.word).join(' ')}</p>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              </div>
+              )}
 
-              {/* Actions */}
-              <div className="flex gap-2">
-                <button className="flex-1 bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded-lg transition">
-                  Download Recording
-                </button>
-                <button className="flex-1 bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded-lg transition">
-                  Download Transcript
-                </button>
-              </div>
+              {/* Summary */}
+              {selectedCall.summary && (
+                <div className="bg-gray-700/50 rounded-lg p-4">
+                  <p className="text-sm text-gray-400 mb-2">Summary</p>
+                  <p className="text-sm">{selectedCall.summary}</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
