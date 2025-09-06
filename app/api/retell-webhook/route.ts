@@ -56,17 +56,30 @@ export async function POST(req: NextRequest) {
       
       console.log(`📍 Phone numbers - From: ${fromNumber}, To: ${toNumber}`);
       
-      // For now, hardcode your Retell number to match what's in the database
-      const retellPhoneNumber = '+12133548232'; // This matches your user_phone_numbers table
+      // Try multiple formats to match database
+      const retellPhoneNumber = '+12133548232';
+      const retellPhoneNumberNoPlus = '12133548232';
       
       console.log(`📍 Looking up user for Retell number: ${retellPhoneNumber}`);
       
-      // Find user
-      const { data: phoneData, error: phoneError } = await supabase
+      // Find user - try with + first
+      let { data: phoneData, error: phoneError } = await supabase
         .from('user_phone_numbers')
         .select('user_id, email')
         .eq('phone_number', retellPhoneNumber)
         .single();
+      
+      // If failed, try without +
+      if (phoneError) {
+        console.log('📍 Trying without + sign:', retellPhoneNumberNoPlus);
+        const result = await supabase
+          .from('user_phone_numbers')
+          .select('user_id, email')
+          .eq('phone_number', retellPhoneNumberNoPlus)
+          .single();
+        phoneData = result.data;
+        phoneError = result.error;
+      }
       
       if (phoneError) {
         console.log('❌ User lookup failed:', phoneError);
@@ -82,7 +95,7 @@ export async function POST(req: NextRequest) {
       const callRecord = {
         call_id: call.call_id,
         agent_id: call.agent_id,
-        user_id: phoneData?.user_id || null,
+        user_id: phoneData ? phoneData.user_id : null, // Add null check
         from_number: fromNumber || 'unknown',
         to_number: toNumber || retellPhoneNumber,
         duration: duration,
