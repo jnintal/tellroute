@@ -1,75 +1,71 @@
-// app/api/calls/route.ts
-import { auth } from '@clerk/nextjs/server';
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+// app/api/calls/route.js
+import { NextResponse } from 'next/server';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
-
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
-    // Get the authenticated user from Clerk
-    const { userId } = await auth();
-    
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    console.log('Fetching calls for user:', userId);
-
-    // Get query params for filtering
-    const searchParams = req.nextUrl.searchParams;
-    const period = searchParams.get('period') || 'all';
-    
-    // Build the query
-    let query = supabase
-      .from('calls')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
-
-    // Add date filtering if needed
-    if (period === 'today') {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      query = query.gte('created_at', today.toISOString());
-    } else if (period === 'week') {
-      const weekAgo = new Date();
-      weekAgo.setDate(weekAgo.getDate() - 7);
-      query = query.gte('created_at', weekAgo.toISOString());
-    } else if (period === 'month') {
-      const monthAgo = new Date();
-      monthAgo.setMonth(monthAgo.getMonth() - 1);
-      query = query.gte('created_at', monthAgo.toISOString());
-    }
-
-    const { data: calls, error } = await query;
-
-    if (error) {
-      console.error('Database error:', error);
-      return NextResponse.json({ error: 'Failed to fetch calls' }, { status: 500 });
-    }
-
-    console.log(`Found ${calls?.length || 0} calls for user ${userId}`);
-
-    // Calculate statistics
-    const stats = {
-      totalCalls: calls?.length || 0,
-      totalDuration: calls?.reduce((sum, call) => sum + (call.duration || 0), 0) || 0,
-      avgDuration: calls?.length ? 
-        Math.floor((calls.reduce((sum, call) => sum + (call.duration || 0), 0) / calls.length)) 
-        : 0,
+    // TODO: Replace with actual database query
+    // For now, returning mock data
+    const mockData = {
+      totalCalls: 156,
+      avgDuration: '3:45',
+      missedCalls: 12,
+      recentCalls: [
+        {
+          id: '1',
+          date: '2024-01-15',
+          time: '10:30 AM',
+          duration: '5:23',
+          from: '+1234567890',
+          to: '+0987654321',
+          status: 'completed',
+          recording: '/recordings/call-1.mp3'
+        },
+        {
+          id: '2',
+          date: '2024-01-15',
+          time: '11:45 AM',
+          duration: '2:15',
+          from: '+1234567891',
+          to: '+0987654322',
+          status: 'missed'
+        },
+        {
+          id: '3',
+          date: '2024-01-15',
+          time: '2:30 PM',
+          duration: '8:45',
+          from: '+1234567892',
+          to: '+0987654323',
+          status: 'completed',
+          recording: '/recordings/call-3.mp3'
+        },
+        {
+          id: '4',
+          date: '2024-01-14',
+          time: '4:15 PM',
+          duration: '1:30',
+          from: '+1234567893',
+          to: '+0987654324',
+          status: 'completed'
+        },
+        {
+          id: '5',
+          date: '2024-01-14',
+          time: '5:00 PM',
+          duration: '0:45',
+          from: '+1234567894',
+          to: '+0987654325',
+          status: 'missed'
+        }
+      ]
     };
 
-    return NextResponse.json({ 
-      calls: calls || [], 
-      stats,
-      userId // Include for debugging
-    });
+    return NextResponse.json(mockData);
   } catch (error) {
-    console.error('API error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('Error in /api/calls:', error);
+    return NextResponse.json(
+      { error: 'Internal Server Error' },
+      { status: 500 }
+    );
   }
 }
