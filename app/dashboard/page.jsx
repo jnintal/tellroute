@@ -6,12 +6,14 @@ import { useEffect, useState } from 'react';
 export default function Dashboard() {
   const [data, setData] = useState({
     totalCalls: 0,
-    avgDuration: '0:00',
-    missedCalls: 0,
+    totalMinutes: 0,
+    textsSent: 0,
+    userPhone: '+1 (555) 123-4567', // This should come from user session
     recentCalls: []
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showDropdown, setShowDropdown] = useState(false);
 
   useEffect(() => {
     const fetchCalls = async () => {
@@ -34,8 +36,9 @@ export default function Dashboard() {
         // Set some default data for testing
         setData({
           totalCalls: 156,
-          avgDuration: '3:45',
-          missedCalls: 12,
+          totalMinutes: 587,
+          textsSent: 342,
+          userPhone: '+1 (555) 123-4567',
           recentCalls: [
             {
               id: '1',
@@ -92,6 +95,16 @@ export default function Dashboard() {
     fetchCalls();
   }, []);
 
+  const handleSignOut = () => {
+    // Add sign out logic here
+    window.location.href = '/sign-in';
+  };
+
+  const getCurrentMonthYear = () => {
+    const date = new Date();
+    return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center">
@@ -106,10 +119,62 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900">
       <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">Call Analytics Dashboard</h1>
-          <p className="text-gray-400">Monitor and track your call center performance</p>
+        {/* Header with User Info */}
+        <div className="mb-8 flex justify-between items-start">
+          <div>
+            <h1 className="text-4xl font-bold text-white mb-2">Call Analytics Dashboard</h1>
+            <p className="text-gray-400">Monitor and track your communication metrics for {getCurrentMonthYear()}</p>
+          </div>
+          
+          {/* User Account Section */}
+          <div className="relative">
+            <button
+              onClick={() => setShowDropdown(!showDropdown)}
+              className="flex items-center space-x-3 bg-gray-800/50 backdrop-blur-lg rounded-lg px-4 py-2 border border-gray-700/50 hover:bg-gray-700/50 transition-colors"
+            >
+              <div className="text-right">
+                <p className="text-sm text-gray-400">Your Number</p>
+                <p className="text-white font-medium">{data.userPhone}</p>
+              </div>
+              <svg className={`w-5 h-5 text-gray-400 transition-transform ${showDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            
+            {/* Dropdown Menu */}
+            {showDropdown && (
+              <div className="absolute right-0 mt-2 w-56 bg-gray-800 rounded-lg shadow-xl border border-gray-700 overflow-hidden z-50">
+                <a href="/account" className="block px-4 py-3 text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
+                  <div className="flex items-center">
+                    <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                    Account Settings
+                  </div>
+                </a>
+                <a href="/billing" className="block px-4 py-3 text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
+                  <div className="flex items-center">
+                    <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                    </svg>
+                    Billing
+                  </div>
+                </a>
+                <hr className="border-gray-700" />
+                <button
+                  onClick={handleSignOut}
+                  className="w-full text-left px-4 py-3 text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
+                >
+                  <div className="flex items-center">
+                    <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    Sign Out
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
         
         {error && (
@@ -123,7 +188,7 @@ export default function Dashboard() {
           </div>
         )}
         
-        {/* Stats Cards */}
+        {/* Stats Cards - Monthly Totals */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-gradient-to-br from-blue-600/20 to-blue-800/20 backdrop-blur-lg rounded-xl p-6 border border-blue-500/20 shadow-xl">
             <div className="flex items-center justify-between mb-2">
@@ -133,29 +198,29 @@ export default function Dashboard() {
               </svg>
             </div>
             <p className="text-4xl font-bold text-white">{data.totalCalls}</p>
-            <p className="text-xs text-blue-400 mt-2">+12% from last week</p>
+            <p className="text-xs text-blue-400 mt-2">This month</p>
           </div>
           
           <div className="bg-gradient-to-br from-green-600/20 to-green-800/20 backdrop-blur-lg rounded-xl p-6 border border-green-500/20 shadow-xl">
             <div className="flex items-center justify-between mb-2">
-              <h2 className="text-sm font-medium text-green-400 uppercase tracking-wider">Avg Duration</h2>
+              <h2 className="text-sm font-medium text-green-400 uppercase tracking-wider">Total Minutes</h2>
               <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
-            <p className="text-4xl font-bold text-white">{data.avgDuration}</p>
-            <p className="text-xs text-green-400 mt-2">Optimal range</p>
+            <p className="text-4xl font-bold text-white">{data.totalMinutes}</p>
+            <p className="text-xs text-green-400 mt-2">This month</p>
           </div>
           
-          <div className="bg-gradient-to-br from-red-600/20 to-red-800/20 backdrop-blur-lg rounded-xl p-6 border border-red-500/20 shadow-xl">
+          <div className="bg-gradient-to-br from-purple-600/20 to-purple-800/20 backdrop-blur-lg rounded-xl p-6 border border-purple-500/20 shadow-xl">
             <div className="flex items-center justify-between mb-2">
-              <h2 className="text-sm font-medium text-red-400 uppercase tracking-wider">Missed Calls</h2>
-              <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 8l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.517l2.257-1.128a1 1 0 00.502-1.21L9.228 3.683A1 1 0 008.279 3H5z" />
+              <h2 className="text-sm font-medium text-purple-400 uppercase tracking-wider">Texts Sent</h2>
+              <svg className="w-8 h-8 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
               </svg>
             </div>
-            <p className="text-4xl font-bold text-white">{data.missedCalls}</p>
-            <p className="text-xs text-red-400 mt-2">-5% from yesterday</p>
+            <p className="text-4xl font-bold text-white">{data.textsSent}</p>
+            <p className="text-xs text-purple-400 mt-2">This month via Twilio</p>
           </div>
         </div>
         
