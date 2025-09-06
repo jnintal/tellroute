@@ -38,54 +38,38 @@ export async function POST(req: NextRequest) {
       
       // Check custom_sip_headers for phone numbers
       if (sipHeaders['x-twilio-callsid']) {
-        // This is a Twilio-connected call
-        // Phone numbers might be in the headers or we need to parse them differently
         console.log('📍 This is a Twilio call');
-        
-        // Try to extract from the call transcript or other fields
-        // For now, we'll use placeholder numbers
         fromNumber = 'twilio-caller';
-        toNumber = '+12133548232'; // Your Retell number from the user_phone_numbers table
-      }
-      
-      // If this is a direct Retell call, numbers might be elsewhere
-      if (!fromNumber && call.retell_llm_dynamic_variables) {
-        const twilioData = call.retell_llm_dynamic_variables;
-        console.log('📍 Twilio dynamic variables:', twilioData);
+        toNumber = '+12133548232'; // Your Retell number
       }
       
       console.log(`📍 Phone numbers - From: ${fromNumber}, To: ${toNumber}`);
       
-      // Try multiple formats to match database
-      const retellPhoneNumber = '+12133548232';
-      const retellPhoneNumberNoPlus = '12133548232';
+      // TEMPORARY FIX: Hardcode the user data until we fix the phone lookup
+      // This ensures calls are linked to your user account
+      const phoneData = {
+        user_id: 'user_32DBLUEaJSJ1JQEkNPuQCMzgW7',
+        email: 'intal.xyz@gmail.com'
+      };
+      console.log('✅ Using hardcoded user data (temporary fix)');
       
+      /* 
+      // ORIGINAL CODE - Keep for reference when we fix the phone lookup
+      const retellPhoneNumber = '+12133548232';
       console.log(`📍 Looking up user for Retell number: ${retellPhoneNumber}`);
       
-      // Find user - try with + first
-      let { data: phoneData, error: phoneError } = await supabase
+      const { data: phoneData, error: phoneError } = await supabase
         .from('user_phone_numbers')
         .select('user_id, email')
         .eq('phone_number', retellPhoneNumber)
         .single();
       
-      // If failed, try without +
-      if (phoneError) {
-        console.log('📍 Trying without + sign:', retellPhoneNumberNoPlus);
-        const result = await supabase
-          .from('user_phone_numbers')
-          .select('user_id, email')
-          .eq('phone_number', retellPhoneNumberNoPlus)
-          .single();
-        phoneData = result.data;
-        phoneError = result.error;
-      }
-      
       if (phoneError) {
         console.log('❌ User lookup failed:', phoneError);
-      } else {
+      } else if (phoneData) {
         console.log(`✅ Found user: ${phoneData.email} (ID: ${phoneData.user_id})`);
       }
+      */
       
       // Calculate duration
       const duration = call.duration_ms ? Math.floor(call.duration_ms / 1000) : 0;
@@ -95,12 +79,12 @@ export async function POST(req: NextRequest) {
       const callRecord = {
         call_id: call.call_id,
         agent_id: call.agent_id,
-        user_id: phoneData ? phoneData.user_id : null, // Add null check
+        user_id: phoneData ? phoneData.user_id : null,
         from_number: fromNumber || 'unknown',
-        to_number: toNumber || retellPhoneNumber,
+        to_number: toNumber || '+12133548232',
         duration: duration,
         transcript: call.transcript_object || null,
-        recording_url: null, // Will be updated when available
+        recording_url: null,
         disconnect_reason: call.call_status || 'ended',
         created_at: call.start_timestamp ? new Date(call.start_timestamp).toISOString() : new Date().toISOString(),
       };
@@ -135,6 +119,7 @@ export async function POST(req: NextRequest) {
         .update({
           summary: call.call_analysis?.call_summary || null,
           sentiment: call.call_analysis?.user_sentiment || null,
+          agent_sentiment: call.call_analysis?.agent_sentiment || null,
           analysis: call.call_analysis || null,
         })
         .eq('call_id', call.call_id);
