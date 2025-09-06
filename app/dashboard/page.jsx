@@ -7,8 +7,7 @@ export default function Dashboard() {
   const [data, setData] = useState({
     totalCalls: 0,
     totalMinutes: 0,
-    textsSent: 0,
-    userPhone: '+1 (555) 123-4567', // This should come from user session
+    totalTexts: 0,
     recentCalls: []
   });
   const [loading, setLoading] = useState(true);
@@ -37,53 +36,52 @@ export default function Dashboard() {
         setData({
           totalCalls: 156,
           totalMinutes: 587,
-          textsSent: 342,
-          userPhone: '+1 (555) 123-4567',
+          totalTexts: 342,
           recentCalls: [
             {
               id: '1',
-              date: '2024-01-15',
-              time: '10:30 AM',
-              duration: '5:23',
-              from: '+1234567890',
-              to: '+0987654321',
-              status: 'completed'
+              direction: 'Inbound',
+              summary: 'The call was brief and appears to have ended abruptly with the user indicating that it concludes. There was no significant interaction or resolution of issues during the call.',
+              phoneNumber: '+18086512711',
+              duration: '00:03',
+              date: '09/05/2025',
+              time: '10:05:38 PM'
             },
             {
               id: '2',
-              date: '2024-01-15',
-              time: '11:45 AM',
-              duration: '2:15',
-              from: '+1234567891',
-              to: '+0987654322',
-              status: 'missed'
+              direction: 'Inbound',
+              summary: 'The user inquired about a dinner reservation for five people at Little Fatty, but the AI agent informed them that reservations cannot be made over the phone and offered to send a link for online reservations, which the user declined.',
+              phoneNumber: '+13107406556',
+              duration: '00:35',
+              date: '09/05/2025',
+              time: '9:08:03 PM'
             },
             {
               id: '3',
-              date: '2024-01-15',
-              time: '2:30 PM',
-              duration: '8:45',
-              from: '+1234567892',
-              to: '+0987654323',
-              status: 'completed'
+              direction: 'Inbound',
+              summary: 'The user requested to speak with a representative, and the AI agent successfully transferred the call to a representative after confirming the request.',
+              phoneNumber: '+16619930444',
+              duration: '00:27',
+              date: '09/05/2025',
+              time: '8:48:29 PM'
             },
             {
               id: '4',
-              date: '2024-01-14',
-              time: '4:15 PM',
-              duration: '1:30',
-              from: '+1234567893',
-              to: '+0987654324',
-              status: 'completed'
+              direction: 'Inbound',
+              summary: 'The user inquired about whether any food at Little Fatty contains MSG. The AI agent was unable to provide that information and successfully transferred the user to a restaurant representative for further assistance.',
+              phoneNumber: '+15126572638',
+              duration: '00:57',
+              date: '09/05/2025',
+              time: '8:24:41 PM'
             },
             {
               id: '5',
-              date: '2024-01-14',
-              time: '5:00 PM',
-              duration: '0:45',
-              from: '+1234567894',
-              to: '+0987654325',
-              status: 'missed'
+              direction: 'Inbound',
+              summary: 'The user called to inquire about the wait time for three people but was frustrated with the AI\'s inability to provide specific information. The call was transferred to a representative, but the transfer was unsuccessful.',
+              phoneNumber: '+13105695944',
+              duration: '00:53',
+              date: '09/05/2025',
+              time: '8:16:47 PM'
             }
           ]
         });
@@ -98,6 +96,11 @@ export default function Dashboard() {
   const handleSignOut = () => {
     // Add sign out logic here
     window.location.href = '/sign-in';
+  };
+
+  const handleViewCall = (callId) => {
+    // Navigate to call details page
+    window.location.href = `/calls/${callId}`;
   };
 
   const getCurrentMonthYear = () => {
@@ -126,16 +129,13 @@ export default function Dashboard() {
             <p className="text-gray-400">Monitor and track your communication metrics for {getCurrentMonthYear()}</p>
           </div>
           
-          {/* User Account Section */}
+          {/* Account Section */}
           <div className="relative">
             <button
               onClick={() => setShowDropdown(!showDropdown)}
-              className="flex items-center space-x-3 bg-gray-800/50 backdrop-blur-lg rounded-lg px-4 py-2 border border-gray-700/50 hover:bg-gray-700/50 transition-colors"
+              className="flex items-center space-x-2 bg-gray-800/50 backdrop-blur-lg rounded-lg px-4 py-2 border border-gray-700/50 hover:bg-gray-700/50 transition-colors"
             >
-              <div className="text-right">
-                <p className="text-sm text-gray-400">Your Number</p>
-                <p className="text-white font-medium">{data.userPhone}</p>
-              </div>
+              <span className="text-white font-medium">Account</span>
               <svg className={`w-5 h-5 text-gray-400 transition-transform ${showDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
               </svg>
@@ -143,24 +143,7 @@ export default function Dashboard() {
             
             {/* Dropdown Menu */}
             {showDropdown && (
-              <div className="absolute right-0 mt-2 w-56 bg-gray-800 rounded-lg shadow-xl border border-gray-700 overflow-hidden z-50">
-                <a href="/account" className="block px-4 py-3 text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
-                  <div className="flex items-center">
-                    <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
-                    Account Settings
-                  </div>
-                </a>
-                <a href="/billing" className="block px-4 py-3 text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
-                  <div className="flex items-center">
-                    <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                    </svg>
-                    Billing
-                  </div>
-                </a>
-                <hr className="border-gray-700" />
+              <div className="absolute right-0 mt-2 w-48 bg-gray-800 rounded-lg shadow-xl border border-gray-700 overflow-hidden z-50">
                 <button
                   onClick={handleSignOut}
                   className="w-full text-left px-4 py-3 text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
@@ -214,66 +197,61 @@ export default function Dashboard() {
           
           <div className="bg-gradient-to-br from-purple-600/20 to-purple-800/20 backdrop-blur-lg rounded-xl p-6 border border-purple-500/20 shadow-xl">
             <div className="flex items-center justify-between mb-2">
-              <h2 className="text-sm font-medium text-purple-400 uppercase tracking-wider">Texts Sent</h2>
+              <h2 className="text-sm font-medium text-purple-400 uppercase tracking-wider">Total Texts</h2>
               <svg className="w-8 h-8 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
               </svg>
             </div>
-            <p className="text-4xl font-bold text-white">{data.textsSent}</p>
-            <p className="text-xs text-purple-400 mt-2">This month via Twilio</p>
+            <p className="text-4xl font-bold text-white">{data.totalTexts}</p>
+            <p className="text-xs text-purple-400 mt-2">This month</p>
           </div>
         </div>
         
         {/* Recent Calls Table */}
         <div className="bg-gray-800/50 backdrop-blur-lg rounded-xl border border-gray-700/50 shadow-xl overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-700/50">
-            <h2 className="text-xl font-semibold text-white flex items-center">
-              <svg className="w-5 h-5 mr-2 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              Recent Calls
-            </h2>
+            <h2 className="text-xl font-semibold text-white">Recent Calls</h2>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-900/50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Date</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Time</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Direction</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Summary</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Phone Number</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Duration</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">From</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">To</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Date</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-700/30">
                 {data.recentCalls.map((call) => (
                   <tr key={call.id} className="hover:bg-gray-700/30 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{call.date}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{call.time}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{call.duration}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-300">{call.from}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-300">{call.to}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        call.status === 'completed' 
-                          ? 'bg-green-900/50 text-green-400 border border-green-500/50' 
-                          : call.status === 'missed' 
-                          ? 'bg-red-900/50 text-red-400 border border-red-500/50'
-                          : 'bg-yellow-900/50 text-yellow-400 border border-yellow-500/50'
-                      }`}>
-                        {call.status === 'completed' && (
-                          <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                          </svg>
-                        )}
-                        {call.status === 'missed' && (
-                          <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                          </svg>
-                        )}
-                        {call.status}
-                      </span>
+                      <span className="text-sm text-gray-300">{call.direction}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <p className="text-sm text-gray-300 line-clamp-2 max-w-md">{call.summary}</p>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="text-sm font-mono text-gray-300">{call.phoneNumber}</span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="text-sm text-gray-300">{call.duration}</span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-300">
+                        <div>{call.date}</div>
+                        <div className="text-xs text-gray-500">{call.time}</div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <button
+                        onClick={() => handleViewCall(call.id)}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+                      >
+                        View
+                      </button>
                     </td>
                   </tr>
                 ))}
