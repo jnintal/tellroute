@@ -8,12 +8,8 @@ export default function Dashboard() {
     totalCalls: 0,
     totalMinutes: 0,
     totalTexts: 0,
-    userPhoneNumbers: [
-      { id: '1', number: '+1 (310) 361-9496', label: 'Main Business Line' },
-      { id: '2', number: '+1 (424) 555-0123', label: 'Support Line' },
-      { id: '3', number: '+1 (818) 555-0456', label: 'Sales Line' }
-    ],
-    selectedPhoneId: '1',
+    userPhoneNumbers: [],
+    selectedPhoneId: null,
     recentCalls: []
   });
   const [loading, setLoading] = useState(true);
@@ -39,8 +35,8 @@ export default function Dashboard() {
         console.error('Error fetching calls:', err);
         setError(err.message || 'Failed to fetch calls');
         
-        // Set some default data for testing - showing only 10 recent calls
-        setData({
+        // Set mock data for testing
+        const mockData = {
           totalCalls: 156,
           totalMinutes: 587,
           totalTexts: 342,
@@ -52,15 +48,15 @@ export default function Dashboard() {
           recentCalls: [
             {
               id: '1',
-              summary: 'The call was brief and appears to have ended abruptly with the user indicating that it concludes. There was no significant interaction or resolution of issues during the call.',
+              summary: 'The call was brief and appears to have ended abruptly with the user indicating that it concludes.',
               phoneNumber: '+18086512711',
               duration: '00:03',
-              date: '09-05-2025',
+              date: '01-15-2024',
               time: '10:05:38 PM'
             },
             {
               id: '2',
-              summary: 'The user inquired about a dinner reservation for five people at Little Fatty, but the AI agent informed them that reservations cannot be made over the phone and offered to send a link for online reservations, which the user declined.',
+              summary: 'The user inquired about a dinner reservation for five people at Little Fatty.',
               phoneNumber: '+13107406556',
               duration: '00:35',
               date: '09-05-2025',
@@ -68,7 +64,7 @@ export default function Dashboard() {
             },
             {
               id: '3',
-              summary: 'The user requested to speak with a representative, and the AI agent successfully transferred the call to a representative after confirming the request.',
+              summary: 'The user requested to speak with a representative.',
               phoneNumber: '+16619930444',
               duration: '00:27',
               date: '09-05-2025',
@@ -76,7 +72,7 @@ export default function Dashboard() {
             },
             {
               id: '4',
-              summary: 'The user inquired about whether any food at Little Fatty contains MSG. The AI agent was unable to provide that information and successfully transferred the user to a restaurant representative for further assistance.',
+              summary: 'The user inquired about whether any food contains MSG.',
               phoneNumber: '+15126572638',
               duration: '00:57',
               date: '09-05-2025',
@@ -84,7 +80,7 @@ export default function Dashboard() {
             },
             {
               id: '5',
-              summary: 'The user called to inquire about the wait time for three people but was frustrated with the AI\'s inability to provide specific information. The call was transferred to a representative, but the transfer was unsuccessful.',
+              summary: 'The user called to inquire about the wait time for three people.',
               phoneNumber: '+13105695944',
               duration: '00:53',
               date: '09-05-2025',
@@ -92,7 +88,7 @@ export default function Dashboard() {
             },
             {
               id: '6',
-              summary: 'Customer requested information about business hours and holiday schedule. The AI agent provided complete information and the call ended successfully.',
+              summary: 'Customer requested information about business hours.',
               phoneNumber: '+14245551234',
               duration: '01:15',
               date: '09-05-2025',
@@ -100,7 +96,7 @@ export default function Dashboard() {
             },
             {
               id: '7',
-              summary: 'Inquiry about catering services for a corporate event. The AI agent collected initial information and transferred to the catering department.',
+              summary: 'Inquiry about catering services for a corporate event.',
               phoneNumber: '+18185554567',
               duration: '02:30',
               date: '09-05-2025',
@@ -108,7 +104,7 @@ export default function Dashboard() {
             },
             {
               id: '8',
-              summary: 'Customer called to check on a previous order status. The AI agent was unable to access order information and attempted transfer to support.',
+              summary: 'Customer called to check on a previous order status.',
               phoneNumber: '+13235558901',
               duration: '00:45',
               date: '09-05-2025',
@@ -116,7 +112,7 @@ export default function Dashboard() {
             },
             {
               id: '9',
-              summary: 'Request for directions to the restaurant location. The AI agent provided the address and offered to send a text message with directions.',
+              summary: 'Request for directions to the restaurant location.',
               phoneNumber: '+16265552345',
               duration: '00:28',
               date: '09-05-2025',
@@ -124,14 +120,15 @@ export default function Dashboard() {
             },
             {
               id: '10',
-              summary: 'Customer complaint about a recent experience. The AI agent listened to the concern and successfully transferred to a manager for resolution.',
+              summary: 'Customer complaint about a recent experience.',
               phoneNumber: '+17145556789',
               duration: '03:12',
               date: '09-05-2025',
               time: '3:20:10 PM'
             }
           ]
-        });
+        };
+        setData(mockData);
       } finally {
         setLoading(false);
       }
@@ -141,19 +138,16 @@ export default function Dashboard() {
   }, []);
 
   const handleSignOut = () => {
-    // Add sign out logic here
     window.location.href = '/sign-in';
   };
 
   const handleViewCall = (callId) => {
-    // Navigate to call details page
     window.location.href = `/calls/${callId}`;
   };
 
   const handlePhoneChange = (phoneId) => {
     setData({ ...data, selectedPhoneId: phoneId });
     setShowPhoneDropdown(false);
-    // TODO: Fetch data for the selected phone number
   };
 
   const getCurrentMonthYear = () => {
@@ -161,7 +155,7 @@ export default function Dashboard() {
     return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   };
 
-  const selectedPhone = data.userPhoneNumbers.find(phone => phone.id === data.selectedPhoneId);
+  const selectedPhone = data?.userPhoneNumbers?.find?.(phone => phone.id === data.selectedPhoneId) || data?.userPhoneNumbers?.[0];
 
   if (loading) {
     return (
@@ -177,47 +171,43 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900">
       <div className="container mx-auto px-4 py-8">
-        {/* Header with Phone Selector and Account */}
         <div className="mb-8">
           <div className="flex justify-between items-start mb-6">
-            {/* Phone Number Selector */}
-            {data.userPhoneNumbers && data.userPhoneNumbers.length > 0 && (
-            <div className="relative">
-              <p className="text-sm text-gray-400 mb-2">Active Route Number</p>
-              <button
-                onClick={() => setShowPhoneDropdown(!showPhoneDropdown)}
-                className="flex items-center space-x-3 bg-gray-800/50 backdrop-blur-lg rounded-lg px-4 py-3 border border-gray-700/50 hover:bg-gray-700/50 transition-colors min-w-[280px]"
-              >
-                <div className="text-left flex-1">
-                  <p className="text-white font-medium">{selectedPhone?.number || 'No phone selected'}</p>
-                  <p className="text-xs text-gray-400">{selectedPhone?.label || ''}</p>
-                </div>
-                <svg className={`w-5 h-5 text-gray-400 transition-transform ${showPhoneDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-              
-              {/* Phone Dropdown */}
-              {showPhoneDropdown && (
-                <div className="absolute left-0 mt-2 w-full bg-gray-800 rounded-lg shadow-xl border border-gray-700 overflow-hidden z-50">
-                  {data.userPhoneNumbers.map((phone) => (
-                    <button
-                      key={phone.id}
-                      onClick={() => handlePhoneChange(phone.id)}
-                      className={`w-full text-left px-4 py-3 hover:bg-gray-700 transition-colors ${
-                        phone.id === data.selectedPhoneId ? 'bg-gray-700/50' : ''
-                      }`}
-                    >
-                      <p className="text-white font-medium">{phone.number}</p>
-                      <p className="text-xs text-gray-400">{phone.label}</p>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            {data?.userPhoneNumbers && data.userPhoneNumbers.length > 0 && (
+              <div className="relative">
+                <p className="text-sm text-gray-400 mb-2">Active Route Number</p>
+                <button
+                  onClick={() => setShowPhoneDropdown(!showPhoneDropdown)}
+                  className="flex items-center space-x-3 bg-gray-800/50 backdrop-blur-lg rounded-lg px-4 py-3 border border-gray-700/50 hover:bg-gray-700/50 transition-colors min-w-[280px]"
+                >
+                  <div className="text-left flex-1">
+                    <p className="text-white font-medium">{selectedPhone?.number || 'No phone selected'}</p>
+                    <p className="text-xs text-gray-400">{selectedPhone?.label || ''}</p>
+                  </div>
+                  <svg className={`w-5 h-5 text-gray-400 transition-transform ${showPhoneDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                
+                {showPhoneDropdown && (
+                  <div className="absolute left-0 mt-2 w-full bg-gray-800 rounded-lg shadow-xl border border-gray-700 overflow-hidden z-50">
+                    {data.userPhoneNumbers.map((phone) => (
+                      <button
+                        key={phone.id}
+                        onClick={() => handlePhoneChange(phone.id)}
+                        className={`w-full text-left px-4 py-3 hover:bg-gray-700 transition-colors ${
+                          phone.id === data.selectedPhoneId ? 'bg-gray-700/50' : ''
+                        }`}
+                      >
+                        <p className="text-white font-medium">{phone.number}</p>
+                        <p className="text-xs text-gray-400">{phone.label}</p>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
 
-            {/* Account Section */}
             <div className="relative">
               <button
                 onClick={() => setShowDropdown(!showDropdown)}
@@ -229,7 +219,6 @@ export default function Dashboard() {
                 </svg>
               </button>
               
-              {/* Account Dropdown */}
               {showDropdown && (
                 <div className="absolute right-0 mt-2 w-48 bg-gray-800 rounded-lg shadow-xl border border-gray-700 overflow-hidden z-50">
                   <button
@@ -265,7 +254,6 @@ export default function Dashboard() {
           </div>
         )}
         
-        {/* Stats Cards - Monthly Totals */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-gradient-to-br from-blue-600/20 to-blue-800/20 backdrop-blur-lg rounded-xl p-6 border border-blue-500/20 shadow-xl">
             <div className="flex items-center justify-between mb-2">
@@ -301,7 +289,6 @@ export default function Dashboard() {
           </div>
         </div>
         
-        {/* Recent Calls Table - Last 10 calls */}
         <div className="bg-gray-800/50 backdrop-blur-lg rounded-xl border border-gray-700/50 shadow-xl overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-700/50 flex justify-between items-center">
             <h2 className="text-xl font-semibold text-white">Recent Calls</h2>
