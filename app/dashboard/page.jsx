@@ -8,11 +8,18 @@ export default function Dashboard() {
     totalCalls: 0,
     totalMinutes: 0,
     totalTexts: 0,
+    userPhoneNumbers: [
+      { id: '1', number: '+1 (310) 361-9496', label: 'Main Business Line' },
+      { id: '2', number: '+1 (424) 555-0123', label: 'Support Line' },
+      { id: '3', number: '+1 (818) 555-0456', label: 'Sales Line' }
+    ],
+    selectedPhoneId: '1',
     recentCalls: []
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [showPhoneDropdown, setShowPhoneDropdown] = useState(false);
 
   useEffect(() => {
     const fetchCalls = async () => {
@@ -32,15 +39,19 @@ export default function Dashboard() {
         console.error('Error fetching calls:', err);
         setError(err.message || 'Failed to fetch calls');
         
-        // Set some default data for testing
+        // Set some default data for testing - showing only 10 recent calls
         setData({
           totalCalls: 156,
           totalMinutes: 587,
           totalTexts: 342,
+          userPhoneNumbers: [
+            { id: '1', number: '+1 (310) 361-9496', label: 'Main Business Line' },
+            { id: '2', number: '+1 (424) 555-0123', label: 'Support Line' }
+          ],
+          selectedPhoneId: '1',
           recentCalls: [
             {
               id: '1',
-              direction: 'Inbound',
               summary: 'The call was brief and appears to have ended abruptly with the user indicating that it concludes. There was no significant interaction or resolution of issues during the call.',
               phoneNumber: '+18086512711',
               duration: '00:03',
@@ -49,39 +60,75 @@ export default function Dashboard() {
             },
             {
               id: '2',
-              direction: 'Inbound',
               summary: 'The user inquired about a dinner reservation for five people at Little Fatty, but the AI agent informed them that reservations cannot be made over the phone and offered to send a link for online reservations, which the user declined.',
               phoneNumber: '+13107406556',
               duration: '00:35',
-              date: '09/05/2025',
+              date: '09-05-2025',
               time: '9:08:03 PM'
             },
             {
               id: '3',
-              direction: 'Inbound',
               summary: 'The user requested to speak with a representative, and the AI agent successfully transferred the call to a representative after confirming the request.',
               phoneNumber: '+16619930444',
               duration: '00:27',
-              date: '09/05/2025',
+              date: '09-05-2025',
               time: '8:48:29 PM'
             },
             {
               id: '4',
-              direction: 'Inbound',
               summary: 'The user inquired about whether any food at Little Fatty contains MSG. The AI agent was unable to provide that information and successfully transferred the user to a restaurant representative for further assistance.',
               phoneNumber: '+15126572638',
               duration: '00:57',
-              date: '09/05/2025',
+              date: '09-05-2025',
               time: '8:24:41 PM'
             },
             {
               id: '5',
-              direction: 'Inbound',
               summary: 'The user called to inquire about the wait time for three people but was frustrated with the AI\'s inability to provide specific information. The call was transferred to a representative, but the transfer was unsuccessful.',
               phoneNumber: '+13105695944',
               duration: '00:53',
-              date: '09/05/2025',
+              date: '09-05-2025',
               time: '8:16:47 PM'
+            },
+            {
+              id: '6',
+              summary: 'Customer requested information about business hours and holiday schedule. The AI agent provided complete information and the call ended successfully.',
+              phoneNumber: '+14245551234',
+              duration: '01:15',
+              date: '09-05-2025',
+              time: '7:45:22 PM'
+            },
+            {
+              id: '7',
+              summary: 'Inquiry about catering services for a corporate event. The AI agent collected initial information and transferred to the catering department.',
+              phoneNumber: '+18185554567',
+              duration: '02:30',
+              date: '09-05-2025',
+              time: '6:30:15 PM'
+            },
+            {
+              id: '8',
+              summary: 'Customer called to check on a previous order status. The AI agent was unable to access order information and attempted transfer to support.',
+              phoneNumber: '+13235558901',
+              duration: '00:45',
+              date: '09-05-2025',
+              time: '5:15:45 PM'
+            },
+            {
+              id: '9',
+              summary: 'Request for directions to the restaurant location. The AI agent provided the address and offered to send a text message with directions.',
+              phoneNumber: '+16265552345',
+              duration: '00:28',
+              date: '09-05-2025',
+              time: '4:45:30 PM'
+            },
+            {
+              id: '10',
+              summary: 'Customer complaint about a recent experience. The AI agent listened to the concern and successfully transferred to a manager for resolution.',
+              phoneNumber: '+17145556789',
+              duration: '03:12',
+              date: '09-05-2025',
+              time: '3:20:10 PM'
             }
           ]
         });
@@ -103,10 +150,18 @@ export default function Dashboard() {
     window.location.href = `/calls/${callId}`;
   };
 
+  const handlePhoneChange = (phoneId) => {
+    setData({ ...data, selectedPhoneId: phoneId });
+    setShowPhoneDropdown(false);
+    // TODO: Fetch data for the selected phone number
+  };
+
   const getCurrentMonthYear = () => {
     const date = new Date();
     return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   };
+
+  const selectedPhone = data.userPhoneNumbers.find(phone => phone.id === data.selectedPhoneId);
 
   if (loading) {
     return (
@@ -122,41 +177,80 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900">
       <div className="container mx-auto px-4 py-8">
-        {/* Header with User Info */}
-        <div className="mb-8 flex justify-between items-start">
+        {/* Header with Phone Selector and Account */}
+        <div className="mb-8">
+          <div className="flex justify-between items-start mb-6">
+            {/* Phone Number Selector */}
+            {data.userPhoneNumbers && data.userPhoneNumbers.length > 0 && (
+            <div className="relative">
+              <p className="text-sm text-gray-400 mb-2">Active Route Number</p>
+              <button
+                onClick={() => setShowPhoneDropdown(!showPhoneDropdown)}
+                className="flex items-center space-x-3 bg-gray-800/50 backdrop-blur-lg rounded-lg px-4 py-3 border border-gray-700/50 hover:bg-gray-700/50 transition-colors min-w-[280px]"
+              >
+                <div className="text-left flex-1">
+                  <p className="text-white font-medium">{selectedPhone?.number || 'No phone selected'}</p>
+                  <p className="text-xs text-gray-400">{selectedPhone?.label || ''}</p>
+                </div>
+                <svg className={`w-5 h-5 text-gray-400 transition-transform ${showPhoneDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              
+              {/* Phone Dropdown */}
+              {showPhoneDropdown && (
+                <div className="absolute left-0 mt-2 w-full bg-gray-800 rounded-lg shadow-xl border border-gray-700 overflow-hidden z-50">
+                  {data.userPhoneNumbers.map((phone) => (
+                    <button
+                      key={phone.id}
+                      onClick={() => handlePhoneChange(phone.id)}
+                      className={`w-full text-left px-4 py-3 hover:bg-gray-700 transition-colors ${
+                        phone.id === data.selectedPhoneId ? 'bg-gray-700/50' : ''
+                      }`}
+                    >
+                      <p className="text-white font-medium">{phone.number}</p>
+                      <p className="text-xs text-gray-400">{phone.label}</p>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            )}
+
+            {/* Account Section */}
+            <div className="relative">
+              <button
+                onClick={() => setShowDropdown(!showDropdown)}
+                className="flex items-center space-x-2 bg-gray-800/50 backdrop-blur-lg rounded-lg px-4 py-2 border border-gray-700/50 hover:bg-gray-700/50 transition-colors"
+              >
+                <span className="text-white font-medium">Account</span>
+                <svg className={`w-5 h-5 text-gray-400 transition-transform ${showDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              
+              {/* Account Dropdown */}
+              {showDropdown && (
+                <div className="absolute right-0 mt-2 w-48 bg-gray-800 rounded-lg shadow-xl border border-gray-700 overflow-hidden z-50">
+                  <button
+                    onClick={handleSignOut}
+                    className="w-full text-left px-4 py-3 text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
+                  >
+                    <div className="flex items-center">
+                      <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                      </svg>
+                      Sign Out
+                    </div>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
           <div>
             <h1 className="text-4xl font-bold text-white mb-2">Call Analytics Dashboard</h1>
             <p className="text-gray-400">Monitor and track your communication metrics for {getCurrentMonthYear()}</p>
-          </div>
-          
-          {/* Account Section */}
-          <div className="relative">
-            <button
-              onClick={() => setShowDropdown(!showDropdown)}
-              className="flex items-center space-x-2 bg-gray-800/50 backdrop-blur-lg rounded-lg px-4 py-2 border border-gray-700/50 hover:bg-gray-700/50 transition-colors"
-            >
-              <span className="text-white font-medium">Account</span>
-              <svg className={`w-5 h-5 text-gray-400 transition-transform ${showDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-            
-            {/* Dropdown Menu */}
-            {showDropdown && (
-              <div className="absolute right-0 mt-2 w-48 bg-gray-800 rounded-lg shadow-xl border border-gray-700 overflow-hidden z-50">
-                <button
-                  onClick={handleSignOut}
-                  className="w-full text-left px-4 py-3 text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
-                >
-                  <div className="flex items-center">
-                    <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                    </svg>
-                    Sign Out
-                  </div>
-                </button>
-              </div>
-            )}
           </div>
         </div>
         
@@ -207,16 +301,16 @@ export default function Dashboard() {
           </div>
         </div>
         
-        {/* Recent Calls Table */}
+        {/* Recent Calls Table - Last 10 calls */}
         <div className="bg-gray-800/50 backdrop-blur-lg rounded-xl border border-gray-700/50 shadow-xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-700/50">
+          <div className="px-6 py-4 border-b border-gray-700/50 flex justify-between items-center">
             <h2 className="text-xl font-semibold text-white">Recent Calls</h2>
+            <p className="text-sm text-gray-400">Last 10 calls</p>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-900/50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Direction</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Summary</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Phone Number</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Duration</th>
@@ -227,11 +321,8 @@ export default function Dashboard() {
               <tbody className="divide-y divide-gray-700/30">
                 {data.recentCalls.map((call) => (
                   <tr key={call.id} className="hover:bg-gray-700/30 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-300">{call.direction}</span>
-                    </td>
                     <td className="px-6 py-4">
-                      <p className="text-sm text-gray-300 line-clamp-2 max-w-md">{call.summary}</p>
+                      <p className="text-sm text-gray-300 line-clamp-2 max-w-lg">{call.summary}</p>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className="text-sm font-mono text-gray-300">{call.phoneNumber}</span>
