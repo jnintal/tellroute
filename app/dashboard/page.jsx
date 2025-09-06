@@ -44,7 +44,7 @@ export default function Dashboard() {
               summary: 'The call was brief and appears to have ended abruptly with the user indicating that it concludes. There was no significant interaction or resolution of issues during the call.',
               phoneNumber: '+18086512711',
               duration: '00:03',
-              date: '09/05/2025',
+              date: '09-05-2025',
               time: '10:05:38 PM'
             },
             {
