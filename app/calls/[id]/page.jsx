@@ -1,162 +1,63 @@
-// app/calls/page.jsx
+// app/calls/[id]/page.jsx
 'use client';
 
 import { useState, useEffect } from 'react';
 
-export default function AllCalls() {
-  const [calls, setCalls] = useState([]);
+export default function CallDetail({ params }) {
+  const [call, setCall] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [sortBy, setSortBy] = useState('date');
-  const [currentPage, setCurrentPage] = useState(1);
-  const callsPerPage = 20;
+  const [showTranscript, setShowTranscript] = useState(true);
 
   useEffect(() => {
-    const fetchAllCalls = async () => {
-      try {
-        setLoading(true);
-        // TODO: Fetch from API
-        // const response = await fetch('/api/calls/all');
-        // const data = await response.json();
-        
-        // Mock data for now - more extensive list
-        const mockCalls = [
-          {
-            id: '1',
-            phoneNumber: '+18086512711',
-            duration: '00:03',
-            date: '01-15-2024',
-            time: '10:05:38 PM',
-            status: 'completed',
-            summary: 'The call was brief and appears to have ended abruptly.'
-          },
-          {
-            id: '2',
-            phoneNumber: '+13107406556',
-            duration: '00:35',
-            date: '01-15-2024',
-            time: '9:08:03 PM',
-            status: 'completed',
-            summary: 'Inquiry about dinner reservation for five people.'
-          },
-          {
-            id: '3',
-            phoneNumber: '+16619930444',
-            duration: '00:27',
-            date: '01-15-2024',
-            time: '8:48:29 PM',
-            status: 'completed',
-            summary: 'Request to speak with a representative.'
-          },
-          {
-            id: '4',
-            phoneNumber: '+15126572638',
-            duration: '00:57',
-            date: '01-15-2024',
-            time: '8:24:41 PM',
-            status: 'completed',
-            summary: 'Inquiry about MSG in food items.'
-          },
-          {
-            id: '5',
-            phoneNumber: '+13105695944',
-            duration: '00:53',
-            date: '01-15-2024',
-            time: '8:16:47 PM',
-            status: 'missed',
-            summary: 'Wait time inquiry for three people.'
-          },
-          {
-            id: '6',
-            phoneNumber: '+14245551234',
-            duration: '01:15',
-            date: '01-14-2024',
-            time: '7:45:22 PM',
-            status: 'completed',
-            summary: 'Business hours information request.'
-          },
-          {
-            id: '7',
-            phoneNumber: '+18185554567',
-            duration: '02:30',
-            date: '01-14-2024',
-            time: '6:30:15 PM',
-            status: 'completed',
-            summary: 'Catering services inquiry.'
-          },
-          {
-            id: '8',
-            phoneNumber: '+13235558901',
-            duration: '00:45',
-            date: '01-14-2024',
-            time: '5:15:45 PM',
-            status: 'missed',
-            summary: 'Order status check.'
-          },
-          {
-            id: '9',
-            phoneNumber: '+16265552345',
-            duration: '00:28',
-            date: '01-14-2024',
-            time: '4:45:30 PM',
-            status: 'completed',
-            summary: 'Directions to restaurant.'
-          },
-          {
-            id: '10',
-            phoneNumber: '+17145556789',
-            duration: '03:12',
-            date: '01-14-2024',
-            time: '3:20:10 PM',
-            status: 'completed',
-            summary: 'Customer complaint resolution.'
-          },
-          // Add more mock data as needed
-        ];
-        
-        setCalls(mockCalls);
-      } catch (error) {
-        console.error('Error fetching calls:', error);
-      } finally {
-        setLoading(false);
+    // Mock data for the specific call based on ID
+    const mockCallData = {
+      '1': {
+        id: '1',
+        date: 'Friday, September 5, 2025',
+        time: '10:05:38 PM (Los Angeles)',
+        duration: '0 minutes 03 seconds',
+        direction: 'Inbound',
+        from: '+18086512711',
+        to: '+13103619496',
+        summary: 'The call was brief and appears to have ended abruptly with the user indicating that it concludes. There was no significant interaction or resolution of issues during the call.',
+        recording: '/recordings/sample.mp3',
+        transcript: [
+          { speaker: 'Agent', text: 'This call may be recorded for quality purposes.' },
+          { speaker: 'User', text: 'This concludes' },
+          { speaker: 'Agent', text: 'recorded for quality purposes,' }
+        ]
+      },
+      '2': {
+        id: '2',
+        date: 'Friday, September 5, 2025',
+        time: '9:08:03 PM (Los Angeles)',
+        duration: '0 minutes 35 seconds',
+        direction: 'Inbound',
+        from: '+13107406556',
+        to: '+13103619496',
+        summary: 'The user inquired about a dinner reservation for five people at Little Fatty, but the AI agent informed them that reservations cannot be made over the phone and offered to send a link for online reservations, which the user declined.',
+        recording: '/recordings/sample.mp3',
+        transcript: [
+          { speaker: 'Agent', text: 'Thank you for calling Little Fatty, how may I help you?' },
+          { speaker: 'User', text: 'I would like to make a reservation for five people' },
+          { speaker: 'Agent', text: 'I apologize, but we cannot make reservations over the phone. I can send you a link for online reservations.' },
+          { speaker: 'User', text: 'No thank you' }
+        ]
       }
     };
-
-    fetchAllCalls();
-  }, []);
-
-  // Filter and sort calls
-  const filteredCalls = calls.filter(call => {
-    const matchesSearch = call.phoneNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          call.summary.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = filterStatus === 'all' || call.status === filterStatus;
-    return matchesSearch && matchesStatus;
-  });
-
-  // Sort calls
-  const sortedCalls = [...filteredCalls].sort((a, b) => {
-    if (sortBy === 'date') {
-      return new Date(b.date + ' ' + b.time) - new Date(a.date + ' ' + a.time);
-    }
-    if (sortBy === 'duration') {
-      return b.duration.localeCompare(a.duration);
-    }
-    return 0;
-  });
-
-  // Pagination
-  const indexOfLastCall = currentPage * callsPerPage;
-  const indexOfFirstCall = indexOfLastCall - callsPerPage;
-  const currentCalls = sortedCalls.slice(indexOfFirstCall, indexOfLastCall);
-  const totalPages = Math.ceil(sortedCalls.length / callsPerPage);
-
-  const handleViewCall = (callId) => {
-    window.location.href = `/calls/${callId}`;
-  };
+    
+    // Get the call data for this ID, or use default
+    const callData = mockCallData[params.id] || mockCallData['1'];
+    setCall(callData);
+    setLoading(false);
+  }, [params.id]);
 
   const handleBack = () => {
     window.location.href = '/dashboard';
+  };
+
+  const handleSummarize = () => {
+    alert('ChatGPT summarization feature coming soon');
   };
 
   if (loading) {
@@ -164,7 +65,20 @@ export default function AllCalls() {
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-          <p className="mt-4 text-gray-400">Loading all calls...</p>
+          <p className="mt-4 text-gray-400">Loading call details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!call) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-400">Call not found</p>
+          <button onClick={handleBack} className="mt-4 text-blue-400 hover:text-blue-300">
+            Back to Dashboard
+          </button>
         </div>
       </div>
     );
@@ -172,7 +86,7 @@ export default function AllCalls() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900">
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-8 max-w-5xl">
         {/* Header */}
         <div className="mb-6">
           <button 
@@ -184,147 +98,81 @@ export default function AllCalls() {
             </svg>
             Back to Dashboard
           </button>
-          <h1 className="text-3xl font-bold text-white mb-2">All Calls</h1>
-          <p className="text-gray-400">Complete call history and management</p>
+          <h1 className="text-3xl font-bold text-white">Call from {call.from}</h1>
         </div>
 
-        {/* Filters and Search */}
-        <div className="bg-gray-800/50 backdrop-blur-lg rounded-xl border border-gray-700/50 p-4 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Search */}
+        {/* Call Details Card */}
+        <div className="bg-gray-800/50 backdrop-blur-lg rounded-xl border border-gray-700/50 p-6 mb-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
             <div>
-              <label className="text-sm text-gray-400 mb-1 block">Search</label>
-              <input
-                type="text"
-                placeholder="Search by number or summary..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full bg-gray-900/50 border border-gray-700 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
-              />
+              <p className="text-gray-400 mb-1">Date:</p>
+              <p className="text-white">{call.date}</p>
             </div>
-
-            {/* Status Filter */}
             <div>
-              <label className="text-sm text-gray-400 mb-1 block">Status</label>
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="w-full bg-gray-900/50 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
-              >
-                <option value="all">All Calls</option>
-                <option value="completed">Completed</option>
-                <option value="missed">Missed</option>
-              </select>
+              <p className="text-gray-400 mb-1">Time:</p>
+              <p className="text-white">{call.time}</p>
             </div>
-
-            {/* Sort By */}
             <div>
-              <label className="text-sm text-gray-400 mb-1 block">Sort By</label>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className="w-full bg-gray-900/50 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
-              >
-                <option value="date">Date (Newest First)</option>
-                <option value="duration">Duration</option>
-              </select>
+              <p className="text-gray-400 mb-1">Duration:</p>
+              <p className="text-white">{call.duration}</p>
+            </div>
+            <div>
+              <p className="text-gray-400 mb-1">Direction:</p>
+              <p className="text-white">{call.direction}</p>
+            </div>
+            <div>
+              <p className="text-gray-400 mb-1">From:</p>
+              <p className="text-white font-mono">{call.from}</p>
+            </div>
+            <div>
+              <p className="text-gray-400 mb-1">To:</p>
+              <p className="text-white font-mono">{call.to}</p>
             </div>
           </div>
         </div>
 
-        {/* Calls Table */}
-        <div className="bg-gray-800/50 backdrop-blur-lg rounded-xl border border-gray-700/50 shadow-xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-700/50">
-            <p className="text-sm text-gray-400">
-              Showing {indexOfFirstCall + 1}-{Math.min(indexOfLastCall, sortedCalls.length)} of {sortedCalls.length} calls
-            </p>
+        {/* Recording Section */}
+        <div className="bg-gray-800/50 backdrop-blur-lg rounded-xl border border-gray-700/50 p-6 mb-6">
+          <h2 className="text-xl font-semibold text-white mb-4">Recording:</h2>
+          <div className="bg-gray-900/50 rounded-lg p-4">
+            <audio controls className="w-full">
+              <source src={call.recording} type="audio/mpeg" />
+              Your browser does not support the audio element.
+            </audio>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-900/50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Phone Number</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Summary</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Duration</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Date</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-700/30">
-                {currentCalls.map((call) => (
-                  <tr key={call.id} className="hover:bg-gray-700/30 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm font-mono text-gray-300">{call.phoneNumber}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <p className="text-sm text-gray-300 line-clamp-2 max-w-md">{call.summary}</p>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-300">{call.duration}</span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-300">
-                        <div>{call.date}</div>
-                        <div className="text-xs text-gray-500">{call.time}</div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                        call.status === 'completed' 
-                          ? 'bg-green-900/50 text-green-400 border border-green-500/50' 
-                          : 'bg-red-900/50 text-red-400 border border-red-500/50'
-                      }`}>
-                        {call.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <button
-                        onClick={() => handleViewCall(call.id)}
-                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
-                      >
-                        View
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {currentCalls.length === 0 && (
-              <div className="text-center py-12">
-                <p className="text-gray-500">No calls found matching your criteria</p>
-              </div>
-            )}
+          <button className="mt-4 text-blue-400 hover:text-blue-300 text-sm">
+            Download audio
+          </button>
+        </div>
+
+        {/* Summary Section */}
+        <div className="bg-gray-800/50 backdrop-blur-lg rounded-xl border border-gray-700/50 p-6 mb-6">
+          <h2 className="text-xl font-semibold text-white mb-4">Summary</h2>
+          <p className="text-gray-300 leading-relaxed">{call.summary}</p>
+        </div>
+
+        {/* Transcript Section */}
+        <div className="bg-gray-800/50 backdrop-blur-lg rounded-xl border border-gray-700/50 p-6 mb-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold text-white">Transcript</h2>
+            <button
+              onClick={() => setShowTranscript(!showTranscript)}
+              className="text-blue-400 hover:text-blue-300 text-sm"
+            >
+              {showTranscript ? 'Hide' : 'Show'} Transcript
+            </button>
           </div>
           
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="px-6 py-4 border-t border-gray-700/50 flex justify-between items-center">
-              <button
-                onClick={() => setCurrentPage(currentPage - 1)}
-                disabled={currentPage === 1}
-                className={`px-4 py-2 rounded-lg transition-colors ${
-                  currentPage === 1 
-                    ? 'bg-gray-700/30 text-gray-500 cursor-not-allowed' 
-                    : 'bg-gray-700/50 text-white hover:bg-gray-600/50'
-                }`}
-              >
-                Previous
-              </button>
-              <span className="text-gray-400">
-                Page {currentPage} of {totalPages}
-              </span>
-              <button
-                onClick={() => setCurrentPage(currentPage + 1)}
-                disabled={currentPage === totalPages}
-                className={`px-4 py-2 rounded-lg transition-colors ${
-                  currentPage === totalPages 
-                    ? 'bg-gray-700/30 text-gray-500 cursor-not-allowed' 
-                    : 'bg-gray-700/50 text-white hover:bg-gray-600/50'
-                }`}
-              >
-                Next
-              </button>
+          {showTranscript && (
+            <div className="space-y-3 bg-gray-900/50 rounded-lg p-4">
+              {call.transcript.map((entry, index) => (
+                <div key={index} className="flex gap-3">
+                  <span className="text-gray-400 font-medium min-w-[80px]">
+                    {entry.speaker}:
+                  </span>
+                  <span className="text-gray-300">{entry.text}</span>
+                </div>
+              ))}
             </div>
           )}
         </div>
