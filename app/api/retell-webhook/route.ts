@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
       const { error: updateError } = await supabase
         .from('calls')
         .update({
-          summary: data.call_analysis?.call_summary || null,
+          summary: data.call_analysis?.call_summary || data.call_analysis?.summary || null,
           // You can add more analysis fields here if needed:
           // user_sentiment: data.call_analysis?.user_sentiment,
           // agent_sentiment: data.call_analysis?.agent_sentiment,
