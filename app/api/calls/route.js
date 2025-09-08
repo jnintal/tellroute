@@ -3,98 +3,120 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { auth } from '@clerk/nextjs';
 
+// Check if environment variables are set
+console.log('Supabase URL exists:', !!process.env.NEXT_PUBLIC_SUPABASE_URL);
+console.log('Supabase Service Key exists:', !!process.env.SUPABASE_SERVICE_KEY);
+
 // Initialize Supabase client
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY // Use service key for server-side
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.SUPABASE_SERVICE_KEY || ''
 );
 
 export async function GET() {
   try {
+    console.log('API /calls route called');
+    
     // Get the current user from Clerk
     const { userId } = auth();
+    console.log('Clerk userId:', userId);
     
-    if (!userId) {
-      // If no user is logged in, return mock data or error
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    // Fetch real calls from Supabase for this user
+    // Fetch ALL calls to test the connection
+    console.log('Attempting to fetch from Supabase...');
+    
     const { data: calls, error } = await supabase
       .from('calls')
       .select('*')
-      .eq('clerk_user_id', userId)
       .order('created_at', { ascending: false })
-      .limit(50); // Get last 50 calls
-
-    if (error) {
-      console.error('Supabase error:', error);
-      // Fall back to mock data if there's an error
-      return NextResponse.json(mockData);
-    }
-
-    // Calculate real statistics from the database
-    const totalCalls = calls?.length || 0;
-    const totalMinutes = calls?.reduce((sum, call) => 
-      sum + Math.ceil((call.duration_seconds || 0) / 60), 0
-    ) || 0;
+      .limit(50);
     
-    // Format the calls for your frontend
-    const formattedCalls = calls?.map(call => ({
-      id: call.call_id,
-      date: new Date(call.created_at).toLocaleDateString(),
-      time: new Date(call.created_at).toLocaleTimeString(),
+    console.log('Supabase response - Error:', error);
+    console.log('Supabase response - Data count:', calls?.length || 0);
+    
+    if (error) {
+      console.error('Supabase error details:', error);
+      // Return empty data instead of mock
+      return NextResponse.json({
+        totalCalls: 0,
+        avgDuration: '0:00',
+        missedCalls: 0,
+        recentCalls: [],
+        debug: {
+          error: error.message,
+          hasSupabaseUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+          hasServiceKey: !!process.env.SUPABASE_SERVICE_KEY
+        }
+      });
+    }
+    
+    // If no data, return empty
+    if (!calls || calls.length === 0) {
+      console.log('No calls found in database');
+      return NextResponse.json({
+        totalCalls: 0,
+        avgDuration: '0:00',
+        missedCalls: 0,
+        recentCalls: [],
+        debug: 'No calls in database'
+      });
+    }
+    
+    console.log('Processing calls data...');
+    
+    // Format calls for the frontend
+    const recentCalls = calls.map(call => ({
+      id: call.call_id || call.id,
+      date: new Date(call.created_at).toLocaleDateString('en-US', {
+        month: '2-digit',
+        day: '2-digit',
+        year: 'numeric'
+      }),
+      time: new Date(call.created_at).toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      }),
       duration: formatDuration(call.duration_seconds),
       from: call.from_number,
       to: call.to_number,
       status: call.call_status || 'completed',
       recording: call.recording_url,
-      summary: call.summary,
-      transcript: call.transcript
-    })) || [];
-
-    // Return real data in the same format as your mock data
-    return NextResponse.json({
-      totalCalls: totalCalls,
-      avgDuration: calculateAvgDuration(calls),
-      missedCalls: calls?.filter(c => c.call_status === 'missed').length || 0,
-      recentCalls: formattedCalls
-    });
-
-  } catch (error) {
-    console.error('Error in /api/calls:', error);
+      summary: call.summary || 'No summary available'
+    }));
     
-    // Return your existing mock data as fallback
-    const mockData = {
-      totalCalls: 156,
-      avgDuration: '3:45',
-      missedCalls: 12,
-      recentCalls: [
-        // ... your existing mock data
-      ]
+    // Calculate statistics
+    const totalCalls = calls.length;
+    const totalSeconds = calls.reduce((sum, call) => sum + (call.duration_seconds || 0), 0);
+    const avgSeconds = totalCalls > 0 ? Math.round(totalSeconds / totalCalls) : 0;
+    
+    const response = {
+      totalCalls: totalCalls,
+      avgDuration: formatDuration(avgSeconds),
+      missedCalls: 0,
+      recentCalls: recentCalls,
+      debug: 'Success - found ' + totalCalls + ' calls'
     };
     
-    return NextResponse.json(mockData);
+    console.log('Returning response with', recentCalls.length, 'calls');
+    
+    return NextResponse.json(response);
+    
+  } catch (error) {
+    console.error('Error in /api/calls:', error);
+    return NextResponse.json(
+      { 
+        error: 'Internal Server Error',
+        details: error.message 
+      },
+      { status: 500 }
+    );
   }
 }
 
 // Helper function to format seconds to "MM:SS"
 function formatDuration(seconds) {
-  if (!seconds) return '0:00';
+  if (!seconds || seconds === 0) return '00:00';
   const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
-}
-
-// Helper function to calculate average duration
-function calculateAvgDuration(calls) {
-  if (!calls || calls.length === 0) return '0:00';
-  const totalSeconds = calls.reduce((sum, call) => 
-    sum + (call.duration_seconds || 0), 0
-  );
-  const avgSeconds = Math.round(totalSeconds / calls.length);
-  return formatDuration(avgSeconds);
+  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 }
