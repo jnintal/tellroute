@@ -1,70 +1,45 @@
 // app/api/calls/route.js
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { auth } from '@clerk/nextjs';
-
-// Check if environment variables are set
-console.log('Supabase URL exists:', !!process.env.NEXT_PUBLIC_SUPABASE_URL);
-console.log('Supabase Service Key exists:', !!process.env.SUPABASE_SERVICE_KEY);
+import { currentUser } from '@clerk/nextjs/server'; // Correct import for Clerk
 
 // Initialize Supabase client
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.SUPABASE_SERVICE_KEY || ''
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY
 );
 
 export async function GET() {
   try {
-    console.log('API /calls route called');
-    
     // Get the current user from Clerk
-    const { userId } = auth();
-    console.log('Clerk userId:', userId);
+    const user = await currentUser();
+    const userId = user?.id;
     
-    // Fetch ALL calls to test the connection
-    console.log('Attempting to fetch from Supabase...');
+    console.log('User ID from Clerk:', userId);
+    console.log('Fetching calls from Supabase...');
     
+    // For now, fetch ALL calls to test
+    // Later you can filter by userId when users are properly linked
     const { data: calls, error } = await supabase
       .from('calls')
       .select('*')
       .order('created_at', { ascending: false })
       .limit(50);
     
-    console.log('Supabase response - Error:', error);
-    console.log('Supabase response - Data count:', calls?.length || 0);
-    
     if (error) {
-      console.error('Supabase error details:', error);
-      // Return empty data instead of mock
+      console.error('Supabase error:', error);
       return NextResponse.json({
         totalCalls: 0,
         avgDuration: '0:00',
         missedCalls: 0,
-        recentCalls: [],
-        debug: {
-          error: error.message,
-          hasSupabaseUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-          hasServiceKey: !!process.env.SUPABASE_SERVICE_KEY
-        }
+        recentCalls: []
       });
     }
     
-    // If no data, return empty
-    if (!calls || calls.length === 0) {
-      console.log('No calls found in database');
-      return NextResponse.json({
-        totalCalls: 0,
-        avgDuration: '0:00',
-        missedCalls: 0,
-        recentCalls: [],
-        debug: 'No calls in database'
-      });
-    }
-    
-    console.log('Processing calls data...');
+    console.log(`Found ${calls?.length || 0} calls`);
     
     // Format calls for the frontend
-    const recentCalls = calls.map(call => ({
+    const recentCalls = calls?.map(call => ({
       id: call.call_id || call.id,
       date: new Date(call.created_at).toLocaleDateString('en-US', {
         month: '2-digit',
@@ -82,32 +57,25 @@ export async function GET() {
       status: call.call_status || 'completed',
       recording: call.recording_url,
       summary: call.summary || 'No summary available'
-    }));
+    })) || [];
     
     // Calculate statistics
-    const totalCalls = calls.length;
-    const totalSeconds = calls.reduce((sum, call) => sum + (call.duration_seconds || 0), 0);
+    const totalCalls = calls?.length || 0;
+    const totalSeconds = calls?.reduce((sum, call) => sum + (call.duration_seconds || 0), 0) || 0;
     const avgSeconds = totalCalls > 0 ? Math.round(totalSeconds / totalCalls) : 0;
     
-    const response = {
+    return NextResponse.json({
       totalCalls: totalCalls,
       avgDuration: formatDuration(avgSeconds),
       missedCalls: 0,
       recentCalls: recentCalls,
-      debug: 'Success - found ' + totalCalls + ' calls'
-    };
-    
-    console.log('Returning response with', recentCalls.length, 'calls');
-    
-    return NextResponse.json(response);
+      userId: userId // Include for debugging
+    });
     
   } catch (error) {
     console.error('Error in /api/calls:', error);
     return NextResponse.json(
-      { 
-        error: 'Internal Server Error',
-        details: error.message 
-      },
+      { error: 'Internal Server Error' },
       { status: 500 }
     );
   }
