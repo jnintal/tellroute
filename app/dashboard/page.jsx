@@ -12,7 +12,7 @@ const supabase = createClient(
 
 export default async function Dashboard() {
   try {
-    // Get auth session
+    // Get auth session from Clerk
     const { userId, sessionClaims } = await auth();
     
     // If no userId, user is not authenticated
@@ -27,7 +27,6 @@ export default async function Dashboard() {
     // Debug logging
     console.log('Dashboard - Clerk User ID:', userId);
     console.log('Dashboard - User Email:', userEmail);
-    console.log('Dashboard - Session Claims:', sessionClaims);
     
     // First, try to get user data by Clerk ID
     let { data: userData, error: userError } = await supabase
@@ -153,7 +152,7 @@ export default async function Dashboard() {
   }
 }
 
-// Helper functions
+// Helper function to format duration
 function formatDuration(seconds) {
   if (!seconds) return '00:00';
   const mins = Math.floor(seconds / 60);
@@ -161,6 +160,7 @@ function formatDuration(seconds) {
   return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 }
 
+// Helper function to format date
 function formatDate(dateString) {
   if (!dateString) return 'N/A';
   const date = new Date(dateString);
@@ -171,6 +171,7 @@ function formatDate(dateString) {
   }).replace(/\//g, '-');
 }
 
+// Helper function to format time
 function formatTime(dateString) {
   if (!dateString) return 'N/A';
   const date = new Date(dateString);
