@@ -1,5 +1,5 @@
 // app/dashboard/page.jsx
-import { currentUser } from '@clerk/nextjs/server';
+import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import DashboardClient from './dashboard-client';
@@ -12,95 +12,83 @@ const supabase = createClient(
 
 export default async function Dashboard() {
   try {
-    // Use currentUser to get the authenticated user
-    const user = await currentUser();
+    // Get auth session
+    const { userId, sessionClaims } = await auth();
     
-    if (!user) {
-      console.log('No user found, redirecting to sign-in');
+    // If no userId, user is not authenticated
+    if (!userId) {
+      console.log('No userId found, redirecting to sign-in');
       redirect('/sign-in');
     }
     
-    // Get user details
-    const userId = user.id;
-    const userEmail = user.emailAddresses[0]?.emailAddress;
+    // Get email from session claims
+    const userEmail = sessionClaims?.email || 'User';
     
     // Debug logging
     console.log('Dashboard - Clerk User ID:', userId);
     console.log('Dashboard - User Email:', userEmail);
+    console.log('Dashboard - Session Claims:', sessionClaims);
     
-    // Fetch user's phone numbers from the users table
-    const { data: userData, error: userError } = await supabase
+    // First, try to get user data by Clerk ID
+    let { data: userData, error: userError } = await supabase
       .from('users')
-      .select('retell_phone_number')
+      .select('*')
       .eq('clerk_user_id', userId)
       .single();
     
-    if (userError) {
-      console.error('Error fetching user data:', userError);
-      console.log('Attempting with email fallback...');
+    // If not found by Clerk ID, try by email and update the Clerk ID
+    if (userError || !userData) {
+      console.log('User not found by Clerk ID, trying email...');
       
-      // Fallback: try to find user by email if clerk_user_id doesn't match
       const { data: userByEmail } = await supabase
         .from('users')
-        .select('retell_phone_number, clerk_user_id')
+        .select('*')
         .eq('email', userEmail)
         .single();
       
       if (userByEmail) {
-        console.log('Found user by email, updating clerk_user_id...');
+        console.log('Found user by email, updating Clerk ID...');
         // Update the clerk_user_id to match current user
         await supabase
           .from('users')
           .update({ clerk_user_id: userId })
           .eq('email', userEmail);
         
-        // Use this data
         userData = userByEmail;
+        
+        // Also update any existing calls to have the correct clerk_user_id
+        await supabase
+          .from('calls')
+          .update({ clerk_user_id: userId })
+          .eq('to_number', userByEmail.retell_phone_number);
+        
+        console.log('Updated user and calls with new Clerk ID');
+      } else {
+        console.log('No user found in database for email:', userEmail);
       }
     }
     
     // Fetch calls from Supabase for this user
-    const { data: calls, error: callsError } = await supabase
-      .from('calls')
-      .select('*')
-      .eq('clerk_user_id', userId)
-      .order('created_at', { ascending: false });
-    
-    if (callsError) {
-      console.error('Error fetching calls:', callsError);
+    let calls = [];
+    if (userId) {
+      const { data: callData, error: callsError } = await supabase
+        .from('calls')
+        .select('*')
+        .eq('clerk_user_id', userId)
+        .order('created_at', { ascending: false });
       
-      // If no calls found with current userId, try updating them if we have the phone number
-      if (userData?.retell_phone_number) {
-        console.log('Attempting to link orphaned calls...');
-        const { data: orphanedCalls } = await supabase
-          .from('calls')
-          .select('*')
-          .eq('to_number', userData.retell_phone_number)
-          .is('clerk_user_id', null);
-        
-        if (orphanedCalls && orphanedCalls.length > 0) {
-          console.log(`Found ${orphanedCalls.length} orphaned calls, linking to user...`);
-          await supabase
-            .from('calls')
-            .update({ clerk_user_id: userId })
-            .eq('to_number', userData.retell_phone_number);
-          
-          // Re-fetch calls after linking
-          const { data: updatedCalls } = await supabase
-            .from('calls')
-            .select('*')
-            .eq('clerk_user_id', userId)
-            .order('created_at', { ascending: false });
-          
-          calls = updatedCalls;
-        }
+      if (callsError) {
+        console.error('Error fetching calls:', callsError);
+      } else {
+        calls = callData || [];
+        console.log(`Found ${calls.length} calls for user`);
       }
     }
     
     // Calculate statistics
-    const totalCalls = calls?.length || 0;
+    const totalCalls = calls.length;
     const totalMinutes = Math.round(
-      (calls?.reduce((sum, call) => sum + (call.duration_seconds || 0), 0) || 0) / 60
+      calls.reduce((sum, call) => sum + (call.duration_seconds || 0), 0) / 60
     );
     
     // For SMS - fetch from sms_queue when ready
@@ -113,14 +101,14 @@ export default async function Dashboard() {
     const totalTexts = smsData?.length || 0;
     
     // Format calls for the dashboard
-    const recentCalls = calls?.slice(0, 10).map(call => ({
+    const recentCalls = calls.slice(0, 10).map(call => ({
       id: call.call_id,
       summary: call.summary || 'Call in progress...',
       phoneNumber: call.from_number,
       duration: formatDuration(call.duration_seconds),
       date: formatDate(call.created_at),
       time: formatTime(call.created_at)
-    })) || [];
+    }));
     
     // Format phone numbers for dropdown
     const userPhoneNumbers = userData?.retell_phone_number ? [
@@ -139,8 +127,14 @@ export default async function Dashboard() {
       userPhoneNumbers,
       selectedPhoneId: '1',
       recentCalls,
-      userEmail: userEmail || 'User'
+      userEmail
     };
+    
+    console.log('Dashboard data prepared:', {
+      totalCalls,
+      totalMinutes,
+      phoneNumber: userData?.retell_phone_number
+    });
     
     return <DashboardClient initialData={dashboardData} />;
     
@@ -151,7 +145,7 @@ export default async function Dashboard() {
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center">
         <div className="text-center">
           <p className="text-white mb-4">Error loading dashboard</p>
-          <p className="text-gray-400 mb-4">Please try signing in again</p>
+          <p className="text-gray-400 mb-4 text-sm">{error?.message || 'Unknown error'}</p>
           <a href="/sign-in" className="text-blue-400 hover:text-blue-300">Go to Sign In</a>
         </div>
       </div>
