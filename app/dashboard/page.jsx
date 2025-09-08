@@ -21,8 +21,14 @@ export default async function Dashboard() {
       redirect('/sign-in');
     }
     
-    // Get email from session claims
-    const userEmail = sessionClaims?.email || 'User';
+    // Debug what Clerk provides
+    console.log('Session claims:', sessionClaims);
+    
+    // Get email from session claims - try multiple possible fields
+    const userEmail = sessionClaims?.email || 
+                     sessionClaims?.emailAddress || 
+                     sessionClaims?.primaryEmailAddress || 
+                     'intal.xyz@gmail.com';
     
     // Debug logging
     console.log('Dashboard - Clerk User ID:', userId);
@@ -132,7 +138,8 @@ export default async function Dashboard() {
     console.log('Dashboard data prepared:', {
       totalCalls,
       totalMinutes,
-      phoneNumber: userData?.retell_phone_number
+      phoneNumber: userData?.retell_phone_number,
+      userEmail
     });
     
     return <DashboardClient initialData={dashboardData} />;
