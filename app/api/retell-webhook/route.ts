@@ -1,145 +1,109 @@
 // app/api/retell-webhook/route.ts
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-
-const supabase = supabaseUrl && supabaseKey 
-  ? createClient(supabaseUrl, supabaseKey)
-  : null;
+// Initialize Supabase client
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_KEY! // Use service key for server-side
+);
 
 export async function POST(req: NextRequest) {
   try {
     const data = await req.json();
     
-    console.log('📍 Webhook event:', data.event);
-    
-    // Handle different event types
+    console.log(`📍 Received webhook event: ${data.event}`);
+    console.log('Full webhook data:', JSON.stringify(data, null, 2));
+
+    // Handle call_started event (optional - just for logging)
     if (data.event === 'call_started') {
-      console.log('📞 Call started:', data.call?.call_id);
-      return Response.json({ received: true });
+      console.log(`📞 Call started: ${data.call_id}`);
+      return NextResponse.json({ received: true });
     }
-    
+
+    // Handle call_ended event - main data storage
     if (data.event === 'call_ended') {
-      console.log('📞 Processing call_ended event...');
-      
       const call = data.call;
-      if (!call) {
-        console.log('❌ No call data in webhook');
-        return Response.json({ error: 'No call data' }, { status: 400 });
-      }
       
-      // Extract phone numbers from custom_sip_headers
-      const sipHeaders = call.custom_sip_headers || {};
-      console.log('📍 SIP Headers:', JSON.stringify(sipHeaders));
+      // Extract the Retell phone number (the number that received the call)
+      const retellPhoneNumber = call.to_number;
+      console.log(`📞 Call ended on number: ${retellPhoneNumber}`);
       
-      // Look for phone numbers in various possible locations
-      let fromNumber = null;
-      let toNumber = null;
-      
-      // Check custom_sip_headers for phone numbers
-      if (sipHeaders['x-twilio-callsid']) {
-        console.log('📍 This is a Twilio call');
-        fromNumber = 'twilio-caller';
-        toNumber = '+12133548232'; // Your Retell number
-      }
-      
-      console.log(`📍 Phone numbers - From: ${fromNumber}, To: ${toNumber}`);
-      
-      // TEMPORARY FIX: Hardcode the user data until we fix the phone lookup
-      // This ensures calls are linked to your user account
-      const phoneData = {
-        user_id: 'user_32DBLUEaJSJ1JQEkNPuQCMzgW7',
-        email: 'intal.xyz@gmail.com'
-      };
-      console.log('✅ Using hardcoded user data (temporary fix)');
-      
-      /* 
-      // ORIGINAL CODE - Keep for reference when we fix the phone lookup
-      const retellPhoneNumber = '+12133548232';
-      console.log(`📍 Looking up user for Retell number: ${retellPhoneNumber}`);
-      
-      const { data: phoneData, error: phoneError } = await supabase
-        .from('user_phone_numbers')
-        .select('user_id, email')
-        .eq('phone_number', retellPhoneNumber)
+      // Find which user owns this Retell phone number
+      const { data: user, error: userError } = await supabase
+        .from('users')
+        .select('clerk_user_id')
+        .eq('retell_phone_number', retellPhoneNumber)
         .single();
       
-      if (phoneError) {
-        console.log('❌ User lookup failed:', phoneError);
-      } else if (phoneData) {
-        console.log(`✅ Found user: ${phoneData.email} (ID: ${phoneData.user_id})`);
+      if (userError || !user) {
+        console.error('❌ No user found for phone:', retellPhoneNumber);
+        // Still save the call but without user association (orphaned call)
+        // You can review these later
       }
-      */
       
-      // Calculate duration
-      const duration = call.duration_ms ? Math.floor(call.duration_ms / 1000) : 0;
-      console.log(`📍 Duration: ${duration} seconds`);
+      // Calculate duration in seconds
+      const durationSeconds = call.duration_ms ? Math.round(call.duration_ms / 1000) : 0;
       
-      // Save the call
-      const callRecord = {
+      // Prepare call data
+      const callData = {
+        clerk_user_id: user?.clerk_user_id || null,
         call_id: call.call_id,
-        agent_id: call.agent_id,
-        user_id: phoneData ? phoneData.user_id : null,
-        from_number: fromNumber || 'unknown',
-        to_number: toNumber || '+12133548232',
-        duration: duration,
-        transcript: call.transcript_object || null,
-        recording_url: null,
-        disconnect_reason: call.call_status || 'ended',
-        created_at: call.start_timestamp ? new Date(call.start_timestamp).toISOString() : new Date().toISOString(),
+        from_number: call.from_number,
+        to_number: call.to_number,
+        direction: call.direction || 'inbound',
+        duration_seconds: durationSeconds,
+        transcript: call.transcript || [],
+        recording_url: call.recording_url || null,
+        summary: null, // Will be updated by call_analyzed event
+        start_timestamp: call.start_timestamp,
+        end_timestamp: call.end_timestamp,
+        created_at: new Date(call.start_timestamp || Date.now()).toISOString()
       };
       
-      console.log('📍 Saving call record...');
+      console.log('💾 Saving call data:', callData);
       
+      // Save call to database
       const { error: insertError } = await supabase
         .from('calls')
-        .insert(callRecord);
+        .insert(callData);
       
       if (insertError) {
-        console.error('❌ Database error:', insertError);
-        return Response.json({ error: 'Failed to save call' }, { status: 500 });
+        console.error('❌ Failed to save call:', insertError);
+        return NextResponse.json({ error: 'Failed to save call' }, { status: 500 });
       }
       
-      console.log('✅ Call saved successfully!');
-      return Response.json({ received: true, saved: true });
+      console.log('✅ Call saved successfully');
     }
-    
+
+    // Handle call_analyzed event - update with AI summary
     if (data.event === 'call_analyzed') {
-      console.log('📊 Call analyzed event');
+      console.log(`🤖 Updating call with AI analysis: ${data.call_id}`);
       
-      const call = data.call;
-      if (!call?.call_id) {
-        console.log('❌ No call ID in analysis event');
-        return Response.json({ error: 'No call ID' }, { status: 400 });
-      }
-      
-      // Update with analysis data
-      const { error } = await supabase
+      const { error: updateError } = await supabase
         .from('calls')
         .update({
-          summary: call.call_analysis?.call_summary || null,
-          sentiment: call.call_analysis?.user_sentiment || null,
-          agent_sentiment: call.call_analysis?.agent_sentiment || null,
-          analysis: call.call_analysis || null,
+          summary: data.call_analysis?.call_summary || null,
+          // You can add more analysis fields here if needed:
+          // user_sentiment: data.call_analysis?.user_sentiment,
+          // agent_sentiment: data.call_analysis?.agent_sentiment,
         })
-        .eq('call_id', call.call_id);
+        .eq('call_id', data.call_id);
       
-      if (error) {
-        console.error('❌ Failed to update analysis:', error);
+      if (updateError) {
+        console.error('❌ Failed to update call analysis:', updateError);
       } else {
-        console.log('✅ Analysis updated successfully');
+        console.log('✅ Call analysis updated');
       }
-      
-      return Response.json({ received: true });
     }
-    
-    console.log('❓ Unknown event type:', data.event);
-    return Response.json({ received: true });
+
+    return NextResponse.json({ received: true });
     
   } catch (error) {
-    console.error('❌ Webhook processing error:', error);
-    return Response.json({ error: 'Server error' }, { status: 500 });
+    console.error('❌ Webhook error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' }, 
+      { status: 500 }
+    );
   }
 }
