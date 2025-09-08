@@ -1,10 +1,8 @@
-// middleware.js - Simple version without Clerk
-import { NextResponse } from 'next/server';
+// middleware.js (in project root)
+import { clerkMiddleware } from '@clerk/nextjs/server';
 
-export function middleware(request) {
-  return NextResponse.next();
-}
+export default clerkMiddleware();
 
 export const config = {
-  matcher: '/((?!api|_next/static|_next/image|favicon.ico).*)',
+  matcher: ['/((?!.*\\..*|_next).*)', '/', '/(api|trpc)(.*)'],
 };

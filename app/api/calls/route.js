@@ -1,92 +1,71 @@
-// app/api/calls/route.js - Connected to Supabase
+// app/api/calls/route.js
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 
-// Initialize Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-if (!supabaseUrl || !supabaseKey) {
-  console.error('Missing Supabase environment variables');
-}
-
-const supabase = createClient(supabaseUrl || '', supabaseKey || '');
-
-export async function GET(request) {
+export async function GET() {
   try {
-    // Get query parameters
-    const { searchParams } = new URL(request.url);
-    const limit = parseInt(searchParams.get('limit')) || 20;
-    const offset = parseInt(searchParams.get('offset')) || 0;
-    
-    // Fetch total count
-    const { count, error: countError } = await supabase
-      .from('calls')
-      .select('*', { count: 'exact', head: true });
+    // TODO: Replace with actual database query
+    // For now, returning mock data
+    const mockData = {
+      totalCalls: 156,
+      avgDuration: '3:45',
+      missedCalls: 12,
+      recentCalls: [
+        {
+          id: '1',
+          date: '2024-01-15',
+          time: '10:30 AM',
+          duration: '5:23',
+          from: '+1234567890',
+          to: '+0987654321',
+          status: 'completed',
+          recording: '/recordings/call-1.mp3'
+        },
+        {
+          id: '2',
+          date: '2024-01-15',
+          time: '11:45 AM',
+          duration: '2:15',
+          from: '+1234567891',
+          to: '+0987654322',
+          status: 'missed'
+        },
+        {
+          id: '3',
+          date: '2024-01-15',
+          time: '2:30 PM',
+          duration: '8:45',
+          from: '+1234567892',
+          to: '+0987654323',
+          status: 'completed',
+          recording: '/recordings/call-3.mp3'
+        },
+        {
+          id: '4',
+          date: '2024-01-14',
+          time: '4:15 PM',
+          duration: '1:30',
+          from: '+1234567893',
+          to: '+0987654324',
+          status: 'completed'
+        },
+        {
+          id: '5',
+          date: '2024-01-14',
+          time: '5:00 PM',
+          duration: '0:45',
+          from: '+1234567894',
+          to: '+0987654325',
+          status: 'missed'
+        }
+      ]
+    };
 
-    if (countError) {
-      console.error('Count error:', countError);
-      // Return empty data instead of error for now
-      return NextResponse.json({
-        success: true,
-        calls: [],
-        total: 0,
-        limit: limit,
-        offset: offset
-      });
-    }
-
-    // Fetch calls from Supabase
-    const { data: calls, error } = await supabase
-      .from('calls')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
-
-    if (error) {
-      console.error('Fetch error:', error);
-      // Return empty data instead of error for now
-      return NextResponse.json({
-        success: true,
-        calls: [],
-        total: 0,
-        limit: limit,
-        offset: offset
-      });
-    }
-
-    // Transform the data to match what the frontend expects
-    const transformedCalls = (calls || []).map(call => ({
-      call_id: call.call_id || call.id,
-      from_number: call.from_number || '',
-      to_number: call.to_number || '',
-      duration: call.duration || 0,
-      status: call.status || 'completed',
-      recording_url: call.recording_url || null,
-      transcript: call.transcript || [],
-      created_at: call.created_at || new Date().toISOString(),
-      ended_at: call.ended_at || null,
-      cost: call.cost || 0,
-      metadata: call.metadata || {}
-    }));
-
-    return NextResponse.json({
-      success: true,
-      calls: transformedCalls,
-      total: count || 0,
-      limit: limit,
-      offset: offset
-    });
-
+    return NextResponse.json(mockData);
   } catch (error) {
     console.error('Error in /api/calls:', error);
-    // Return empty data instead of error to prevent page crash
-    return NextResponse.json({
-      success: true,
-      calls: [],
-      total: 0,
-      limit: 20,
-      offset: 0
-    });
+    return NextResponse.json(
+      { error: 'Internal Server Error' },
+      { status: 500 }
+    );
   }
 }
