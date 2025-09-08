@@ -15,6 +15,79 @@ export default function DashboardClient({ initialData }) {
   const router = useRouter();
   const { signOut } = useClerk();
 
+  // Client-side formatting functions that use browser's timezone
+  const formatTimeClient = (dateString) => {
+    if (!dateString) return 'N/A';
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+        // No timeZone specified = uses browser's local timezone automatically
+      });
+    } catch (e) {
+      return 'N/A';
+    }
+  };
+
+  const formatDateClient = (dateString) => {
+    if (!dateString) return 'N/A';
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', {
+        month: '2-digit',
+        day: '2-digit',
+        year: 'numeric'
+        // No timeZone specified = uses browser's local timezone automatically
+      }).replace(/\//g, '-');
+    } catch (e) {
+      return 'N/A';
+    }
+  };
+
+  // Format relative time (e.g., "2 hours ago")
+  const formatRelativeTime = (dateString) => {
+    if (!dateString) return 'N/A';
+    try {
+      const date = new Date(dateString);
+      const now = new Date();
+      const diffMs = now - date;
+      const diffMins = Math.floor(diffMs / 60000);
+      
+      if (diffMins < 1) return 'Just now';
+      if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
+      if (diffMins < 1440) {
+        const hours = Math.floor(diffMins / 60);
+        return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+      }
+      if (diffMins < 10080) {
+        const days = Math.floor(diffMins / 1440);
+        return `${days} day${days > 1 ? 's' : ''} ago`;
+      }
+      return formatDateClient(dateString);
+    } catch (e) {
+      return 'N/A';
+    }
+  };
+
+  // Update the recentCalls data to use client-side formatting
+  useEffect(() => {
+    if (data.recentCalls) {
+      const updatedCalls = data.recentCalls.map(call => ({
+        ...call,
+        displayDate: formatDateClient(call.date),
+        displayTime: formatTimeClient(call.time),
+        relativeTime: formatRelativeTime(call.date + ' ' + call.time)
+      }));
+      
+      setData(prev => ({
+        ...prev,
+        recentCalls: updatedCalls
+      }));
+    }
+  }, []); // Run once on mount
+
   // Handle sign out with Clerk
   const handleSignOut = async () => {
     try {
@@ -36,7 +109,6 @@ export default function DashboardClient({ initialData }) {
   const handlePhoneChange = (phoneId) => {
     setData({ ...data, selectedPhoneId: phoneId });
     setShowPhoneDropdown(false);
-    // In the future, this could trigger a data refresh for the selected phone
   };
 
   const getCurrentMonthYear = () => {
@@ -67,6 +139,15 @@ export default function DashboardClient({ initialData }) {
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
   }, []);
+
+  // Display user's timezone for reference
+  const getUserTimezone = () => {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone;
+    } catch {
+      return 'Local';
+    }
+  };
 
   if (loading) {
     return (
@@ -141,6 +222,7 @@ export default function DashboardClient({ initialData }) {
                 <div className="px-4 py-3 border-b border-gray-700">
                   <p className="text-sm text-gray-400">Signed in as</p>
                   <p className="text-sm font-medium text-white truncate">{data.userEmail}</p>
+                  <p className="text-xs text-gray-500 mt-1">Timezone: {getUserTimezone()}</p>
                 </div>
                 <button
                   onClick={handleSignOut}
@@ -242,8 +324,8 @@ export default function DashboardClient({ initialData }) {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-300">
-                          <div>{call.date}</div>
-                          <div className="text-xs text-gray-500">{call.time}</div>
+                          <div>{call.displayDate || formatDateClient(call.date)}</div>
+                          <div className="text-xs text-gray-500">{call.displayTime || formatTimeClient(call.time)}</div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
