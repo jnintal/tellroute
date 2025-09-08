@@ -1,5 +1,5 @@
 // app/dashboard/page.jsx
-import { auth, currentUser } from '@clerk/nextjs/server';
+import { currentUser } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import DashboardClient from './dashboard-client';
@@ -12,19 +12,21 @@ const supabase = createClient(
 
 export default async function Dashboard() {
   try {
-    // Get the authenticated user from Clerk
-    const { userId } = auth();
+    // Use currentUser to get the authenticated user
     const user = await currentUser();
     
-    // Debug logging
-    console.log('Dashboard - Clerk User ID:', userId);
-    console.log('Dashboard - User Email:', user?.emailAddresses[0]?.emailAddress);
-    
-    // Only redirect if truly not authenticated
-    if (!userId && !user) {
+    if (!user) {
       console.log('No user found, redirecting to sign-in');
       redirect('/sign-in');
     }
+    
+    // Get user details
+    const userId = user.id;
+    const userEmail = user.emailAddresses[0]?.emailAddress;
+    
+    // Debug logging
+    console.log('Dashboard - Clerk User ID:', userId);
+    console.log('Dashboard - User Email:', userEmail);
     
     // Fetch user's phone numbers from the users table
     const { data: userData, error: userError } = await supabase
@@ -35,6 +37,26 @@ export default async function Dashboard() {
     
     if (userError) {
       console.error('Error fetching user data:', userError);
+      console.log('Attempting with email fallback...');
+      
+      // Fallback: try to find user by email if clerk_user_id doesn't match
+      const { data: userByEmail } = await supabase
+        .from('users')
+        .select('retell_phone_number, clerk_user_id')
+        .eq('email', userEmail)
+        .single();
+      
+      if (userByEmail) {
+        console.log('Found user by email, updating clerk_user_id...');
+        // Update the clerk_user_id to match current user
+        await supabase
+          .from('users')
+          .update({ clerk_user_id: userId })
+          .eq('email', userEmail);
+        
+        // Use this data
+        userData = userByEmail;
+      }
     }
     
     // Fetch calls from Supabase for this user
@@ -46,6 +68,33 @@ export default async function Dashboard() {
     
     if (callsError) {
       console.error('Error fetching calls:', callsError);
+      
+      // If no calls found with current userId, try updating them if we have the phone number
+      if (userData?.retell_phone_number) {
+        console.log('Attempting to link orphaned calls...');
+        const { data: orphanedCalls } = await supabase
+          .from('calls')
+          .select('*')
+          .eq('to_number', userData.retell_phone_number)
+          .is('clerk_user_id', null);
+        
+        if (orphanedCalls && orphanedCalls.length > 0) {
+          console.log(`Found ${orphanedCalls.length} orphaned calls, linking to user...`);
+          await supabase
+            .from('calls')
+            .update({ clerk_user_id: userId })
+            .eq('to_number', userData.retell_phone_number);
+          
+          // Re-fetch calls after linking
+          const { data: updatedCalls } = await supabase
+            .from('calls')
+            .select('*')
+            .eq('clerk_user_id', userId)
+            .order('created_at', { ascending: false });
+          
+          calls = updatedCalls;
+        }
+      }
     }
     
     // Calculate statistics
@@ -90,7 +139,7 @@ export default async function Dashboard() {
       userPhoneNumbers,
       selectedPhoneId: '1',
       recentCalls,
-      userEmail: user?.emailAddresses[0]?.emailAddress || 'User'
+      userEmail: userEmail || 'User'
     };
     
     return <DashboardClient initialData={dashboardData} />;
@@ -102,7 +151,8 @@ export default async function Dashboard() {
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center">
         <div className="text-center">
           <p className="text-white mb-4">Error loading dashboard</p>
-          <a href="/sign-in" className="text-blue-400 hover:text-blue-300">Try signing in again</a>
+          <p className="text-gray-400 mb-4">Please try signing in again</p>
+          <a href="/sign-in" className="text-blue-400 hover:text-blue-300">Go to Sign In</a>
         </div>
       </div>
     );
