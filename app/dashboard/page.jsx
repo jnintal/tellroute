@@ -45,9 +45,17 @@ export default function Dashboard() {
           totalTexts: 0 // SMS not implemented yet
         });
 
-        // Format recent calls with local timezone
+        // Format recent calls with proper UTC to local timezone conversion
         const formattedCalls = data.recentCalls?.slice(0, 5).map(call => {
-          const callDate = new Date(call.timestamp);
+          // Check if timestamp already has timezone info, if not add Z for UTC
+          let timestamp = call.timestamp;
+          if (!timestamp.endsWith('Z') && !timestamp.includes('+') && !timestamp.includes('T')) {
+            timestamp = timestamp + 'Z';
+          } else if (timestamp.includes('T') && !timestamp.endsWith('Z') && !timestamp.includes('+')) {
+            timestamp = timestamp + 'Z';
+          }
+          
+          const callDate = new Date(timestamp);
           
           return {
             id: call.id,
