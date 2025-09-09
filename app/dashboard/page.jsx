@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
+import SyncButton from '../components/SyncButton';
 
 export default function Dashboard() {
   const [metrics, setMetrics] = useState({
@@ -108,9 +109,12 @@ export default function Dashboard() {
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">Dashboard</h1>
-          <p className="text-gray-400">Welcome back! Here's your activity overview.</p>
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-4xl font-bold text-white mb-2">Dashboard</h1>
+            <p className="text-gray-400">Welcome back! Here's your activity overview.</p>
+          </div>
+          <SyncButton onSync={fetchDashboardData} />
         </div>
 
         {/* Metrics Grid */}
