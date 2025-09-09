@@ -1,190 +1,239 @@
-// app/dashboard/page.jsx
-import { auth } from '@clerk/nextjs/server';
-import { redirect } from 'next/navigation';
-import { createClient } from '@supabase/supabase-js';
-import DashboardClient from './dashboard-client';
+// app/dashboard/page.jsx - Dashboard with Clerk
+'use client';
 
-// Initialize Supabase client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY
-);
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@clerk/nextjs';
 
-export default async function Dashboard() {
-  try {
-    // Get auth session from Clerk
-    const { userId, sessionClaims } = await auth();
+export default function Dashboard() {
+  const [metrics, setMetrics] = useState({
+    totalCalls: 0,
+    totalMinutes: 0,
+    totalTexts: 0
+  });
+  const [recentCalls, setRecentCalls] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
+  const { isLoaded, userId } = useAuth();
+
+  useEffect(() => {
+    // Wait for Clerk to load
+    if (!isLoaded) return;
     
-    // If no userId, user is not authenticated
+    // If no user, redirect to sign-in
     if (!userId) {
-      console.log('No userId found, redirecting to sign-in');
-      redirect('/sign-in');
+      router.push('/sign-in');
+      return;
     }
-    
-    // Debug what Clerk provides
-    console.log('Session claims:', sessionClaims);
-    
-    // Get email from session claims - try multiple possible fields
-    const userEmail = sessionClaims?.email || 
-                     sessionClaims?.emailAddress || 
-                     sessionClaims?.primaryEmailAddress || 
-                     'intal.xyz@gmail.com';
-    
-    // Debug logging
-    console.log('Dashboard - Clerk User ID:', userId);
-    console.log('Dashboard - User Email:', userEmail);
-    
-    // First, try to get user data by Clerk ID
-    let { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('*')
-      .eq('clerk_user_id', userId)
-      .single();
-    
-    // If not found by Clerk ID, try by email and update the Clerk ID
-    if (userError || !userData) {
-      console.log('User not found by Clerk ID, trying email...');
+
+    // Fetch dashboard data
+    fetchDashboardData();
+  }, [isLoaded, userId]);
+
+  const fetchDashboardData = async () => {
+    try {
+      // Fetch real calls from API
+      const response = await fetch('/api/calls?limit=5');
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Calculate metrics from real data
+        const totalCalls = data.total || 0;
+        const totalMinutes = data.calls.reduce((sum, call) => {
+          return sum + (call.duration || 0);
+        }, 0);
+        
+        setMetrics({
+          totalCalls: totalCalls,
+          totalMinutes: Math.floor(totalMinutes / 60), // Convert seconds to minutes
+          totalTexts: 0 // SMS not implemented yet
+        });
+
+        // Format recent calls for display
+        setRecentCalls(data.calls.slice(0, 5).map(call => ({
+          id: call.call_id,
+          phoneNumber: formatPhoneNumber(call.from_number),
+          duration: formatDuration(call.duration),
+          time: new Date(call.created_at).toLocaleTimeString('en-US', { 
+            hour: '2-digit', 
+            minute: '2-digit',
+            hour12: true
+          }),
+          summary: getSummaryFromTranscript(call.transcript)
+        })));
+      }
       
-      const { data: userByEmail } = await supabase
-        .from('users')
-        .select('*')
-        .eq('email', userEmail)
-        .single();
-      
-      if (userByEmail) {
-        console.log('Found user by email, updating Clerk ID...');
-        // Update the clerk_user_id to match current user
-        await supabase
-          .from('users')
-          .update({ clerk_user_id: userId })
-          .eq('email', userEmail);
-        
-        userData = userByEmail;
-        
-        // Also update any existing calls to have the correct clerk_user_id
-        await supabase
-          .from('calls')
-          .update({ clerk_user_id: userId })
-          .eq('to_number', userByEmail.retell_phone_number);
-        
-        console.log('Updated user and calls with new Clerk ID');
-      } else {
-        console.log('No user found in database for email:', userEmail);
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+      setLoading(false);
+    }
+  };
+
+  const formatPhoneNumber = (phone) => {
+    if (!phone) return 'Unknown';
+    const cleaned = phone.replace(/\D/g, '');
+    if (cleaned.length === 10) {
+      return `+1 (${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
+    }
+    return phone;
+  };
+
+  const formatDuration = (seconds) => {
+    if (!seconds) return '00:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  };
+
+  const getSummaryFromTranscript = (transcript) => {
+    if (!transcript || transcript.length === 0) return 'No transcript available';
+    
+    if (typeof transcript === 'string') {
+      try {
+        transcript = JSON.parse(transcript);
+      } catch {
+        return transcript.substring(0, 100);
       }
     }
-    
-    // Fetch calls from Supabase for this user
-    let calls = [];
-    if (userId) {
-      const { data: callData, error: callsError } = await supabase
-        .from('calls')
-        .select('*')
-        .eq('clerk_user_id', userId)
-        .order('created_at', { ascending: false });
-      
-      if (callsError) {
-        console.error('Error fetching calls:', callsError);
-      } else {
-        calls = callData || [];
-        console.log(`Found ${calls.length} calls for user`);
-      }
+
+    const firstUserMessage = transcript.find(t => t.role === 'user');
+    if (firstUserMessage) {
+      const content = firstUserMessage.content || firstUserMessage.message || '';
+      return content.substring(0, 100) + (content.length > 100 ? '...' : '');
     }
-    
-    // Calculate statistics
-    const totalCalls = calls.length;
-    const totalMinutes = Math.round(
-      calls.reduce((sum, call) => sum + (call.duration_seconds || 0), 0) / 60
-    );
-    
-    // For SMS - fetch from sms_queue when ready
-    const { data: smsData } = await supabase
-      .from('sms_queue')
-      .select('*')
-      .eq('clerk_user_id', userId)
-      .eq('sent', true);
-    
-    const totalTexts = smsData?.length || 0;
-    
-    // Format calls for the dashboard
-    const recentCalls = calls.slice(0, 10).map(call => ({
-      id: call.call_id,
-      summary: call.summary || 'Call in progress...',
-      phoneNumber: call.from_number,
-      duration: formatDuration(call.duration_seconds),
-      date: formatDate(call.created_at),
-      time: formatTime(call.created_at)
-    }));
-    
-    // Format phone numbers for dropdown
-    const userPhoneNumbers = userData?.retell_phone_number ? [
-      {
-        id: '1',
-        number: userData.retell_phone_number,
-        label: 'Primary'
-      }
-    ] : [];
-    
-    // Prepare data for client component
-    const dashboardData = {
-      totalCalls,
-      totalMinutes,
-      totalTexts,
-      userPhoneNumbers,
-      selectedPhoneId: '1',
-      recentCalls,
-      userEmail
-    };
-    
-    console.log('Dashboard data prepared:', {
-      totalCalls,
-      totalMinutes,
-      phoneNumber: userData?.retell_phone_number,
-      userEmail
-    });
-    
-    return <DashboardClient initialData={dashboardData} />;
-    
-  } catch (error) {
-    console.error('Dashboard error:', error);
-    // Return a basic error state instead of crashing
+
+    return 'Brief conversation';
+  };
+
+  const handleViewAllCalls = () => {
+    router.push('/calls');
+  };
+
+  const handleViewCall = (callId) => {
+    router.push(`/calls/${callId}`);
+  };
+
+  if (!isLoaded || loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center">
         <div className="text-center">
-          <p className="text-white mb-4">Error loading dashboard</p>
-          <p className="text-gray-400 mb-4 text-sm">{error?.message || 'Unknown error'}</p>
-          <a href="/sign-in" className="text-blue-400 hover:text-blue-300">Go to Sign In</a>
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+          <p className="mt-4 text-gray-400">Loading dashboard...</p>
         </div>
       </div>
     );
   }
-}
 
-// Helper function to format duration
-function formatDuration(seconds) {
-  if (!seconds) return '00:00';
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-}
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900">
+      <div className="container mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-4xl font-bold text-white mb-2">Dashboard</h1>
+          <p className="text-gray-400">Welcome back! Here's your activity overview.</p>
+        </div>
 
-// Helper function to format date
-function formatDate(dateString) {
-  if (!dateString) return 'N/A';
-  const date = new Date(dateString);
-  return date.toLocaleDateString('en-US', {
-    month: '2-digit',
-    day: '2-digit',
-    year: 'numeric'
-  }).replace(/\//g, '-');
-}
+        {/* Metrics Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="bg-gradient-to-br from-blue-600/20 to-blue-800/20 backdrop-blur-lg rounded-xl p-6 border border-blue-500/20">
+            <div className="flex items-center justify-between mb-4">
+              <div className="bg-blue-500/20 p-3 rounded-lg">
+                <svg className="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                </svg>
+              </div>
+              <span className="text-xs text-gray-400">This month</span>
+            </div>
+            <div className="text-3xl font-bold text-white mb-1">{metrics.totalCalls.toLocaleString()}</div>
+            <div className="text-sm text-gray-400">Total Calls</div>
+          </div>
 
-// Helper function to format time
-function formatTime(dateString) {
-  if (!dateString) return 'N/A';
-  const date = new Date(dateString);
-  return date.toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true
-  });
+          <div className="bg-gradient-to-br from-purple-600/20 to-purple-800/20 backdrop-blur-lg rounded-xl p-6 border border-purple-500/20">
+            <div className="flex items-center justify-between mb-4">
+              <div className="bg-purple-500/20 p-3 rounded-lg">
+                <svg className="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <span className="text-xs text-gray-400">This month</span>
+            </div>
+            <div className="text-3xl font-bold text-white mb-1">{metrics.totalMinutes.toLocaleString()}</div>
+            <div className="text-sm text-gray-400">Total Minutes</div>
+          </div>
+
+          <div className="bg-gradient-to-br from-green-600/20 to-green-800/20 backdrop-blur-lg rounded-xl p-6 border border-green-500/20">
+            <div className="flex items-center justify-between mb-4">
+              <div className="bg-green-500/20 p-3 rounded-lg">
+                <svg className="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                </svg>
+              </div>
+              <span className="text-xs text-gray-400">This month</span>
+            </div>
+            <div className="text-3xl font-bold text-white mb-1">{metrics.totalTexts.toLocaleString()}</div>
+            <div className="text-sm text-gray-400">Total Texts</div>
+          </div>
+        </div>
+
+        {/* Recent Calls */}
+        <div className="bg-gray-800/50 backdrop-blur-lg rounded-xl border border-gray-700/50 shadow-xl">
+          <div className="px-6 py-4 border-b border-gray-700/50 flex justify-between items-center">
+            <h2 className="text-xl font-semibold text-white">Recent Calls</h2>
+            <button
+              onClick={handleViewAllCalls}
+              className="text-blue-400 hover:text-blue-300 text-sm font-medium transition-colors"
+            >
+              View all calls →
+            </button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-900/50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Phone Number</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Summary</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Duration</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Time</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-700/30">
+                {recentCalls.length > 0 ? recentCalls.map((call) => (
+                  <tr key={call.id} className="hover:bg-gray-700/30 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="text-sm font-mono text-gray-300">{call.phoneNumber}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <p className="text-sm text-gray-300 line-clamp-1 max-w-md">{call.summary}</p>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="text-sm text-gray-300">{call.duration}</span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="text-sm text-gray-300">{call.time}</span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <button
+                        onClick={() => handleViewCall(call.id)}
+                        className="text-blue-400 hover:text-blue-300 text-sm font-medium"
+                      >
+                        View
+                      </button>
+                    </td>
+                  </tr>
+                )) : (
+                  <tr>
+                    <td colSpan="5" className="px-6 py-8 text-center text-gray-400">
+                      No calls yet. Calls will appear here once you receive them.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }

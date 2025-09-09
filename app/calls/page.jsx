@@ -12,23 +12,21 @@ export default function AllCalls() {
   useEffect(() => {
     const fetchCalls = async () => {
       try {
-        console.log('Fetching calls from API...');
         const response = await fetch('/api/calls');
         const data = await response.json();
         console.log('API Response:', data);
         
-        // Transform the recentCalls array into the format your component expects
-        const formattedCalls = data.recentCalls?.map((call, index) => ({
-          id: call.id || String(index + 1),
+        // Transform the recentCalls array - fixing date format and ensuring unique IDs
+        const formattedCalls = data.recentCalls?.map((call) => ({
+          id: call.id,
           phoneNumber: call.from,
           duration: call.duration,
-          date: call.date,
+          date: call.date.replace(/\//g, '-'), // Convert 09/08/2025 to 09-08-2025
           time: call.time,
-          summary: call.summary || 'No summary available'
+          summary: call.summary
         })) || [];
         
         console.log('Formatted calls:', formattedCalls);
-        
         setCalls(formattedCalls);
         setLoading(false);
       } catch (error) {
@@ -47,7 +45,8 @@ export default function AllCalls() {
   const totalPages = Math.ceil(calls.length / callsPerPage);
 
   const handleViewCall = (callId) => {
-    window.location.href = `/calls/${callId}`;
+    console.log('Navigating to call:', callId);
+    window.location.href = `/calls/${encodeURIComponent(callId)}`;
   };
 
   const handleBack = () => {
@@ -56,7 +55,6 @@ export default function AllCalls() {
 
   const handlePageChange = (pageNumber) => {
     setCurrentPage(pageNumber);
-    // Scroll to top of table
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -109,8 +107,8 @@ export default function AllCalls() {
               </thead>
               <tbody className="divide-y divide-gray-700/30">
                 {currentCalls.length > 0 ? (
-                  currentCalls.map((call) => (
-                    <tr key={call.id} className="hover:bg-gray-700/30 transition-colors">
+                  currentCalls.map((call, index) => (
+                    <tr key={`${call.id}_${index}`} className="hover:bg-gray-700/30 transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="text-sm font-mono text-gray-300">{call.phoneNumber}</span>
                       </td>

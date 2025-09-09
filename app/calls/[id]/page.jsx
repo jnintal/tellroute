@@ -2,62 +2,66 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function CallDetail({ params }) {
   const [call, setCall] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showTranscript, setShowTranscript] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
-    // Mock data for the specific call based on ID
-    const mockCallData = {
-      '1': {
-        id: '1',
-        date: 'Friday, September 5, 2025',
-        time: '10:05:38 PM (Los Angeles)',
-        duration: '0 minutes 03 seconds',
-        direction: 'Inbound',
-        from: '+18086512711',
-        to: '+13103619496',
-        summary: 'The call was brief and appears to have ended abruptly with the user indicating that it concludes. There was no significant interaction or resolution of issues during the call.',
-        recording: '/recordings/sample.mp3',
-        transcript: [
-          { speaker: 'Agent', text: 'This call may be recorded for quality purposes.' },
-          { speaker: 'User', text: 'This concludes' },
-          { speaker: 'Agent', text: 'recorded for quality purposes,' }
-        ]
-      },
-      '2': {
-        id: '2',
-        date: 'Friday, September 5, 2025',
-        time: '9:08:03 PM (Los Angeles)',
-        duration: '0 minutes 35 seconds',
-        direction: 'Inbound',
-        from: '+13107406556',
-        to: '+13103619496',
-        summary: 'The user inquired about a dinner reservation for five people at Little Fatty, but the AI agent informed them that reservations cannot be made over the phone and offered to send a link for online reservations, which the user declined.',
-        recording: '/recordings/sample.mp3',
-        transcript: [
-          { speaker: 'Agent', text: 'Thank you for calling Little Fatty, how may I help you?' },
-          { speaker: 'User', text: 'I would like to make a reservation for five people' },
-          { speaker: 'Agent', text: 'I apologize, but we cannot make reservations over the phone. I can send you a link for online reservations.' },
-          { speaker: 'User', text: 'No thank you' }
-        ]
-      }
-    };
-    
-    // Get the call data for this ID, or use default
-    const callData = mockCallData[params.id] || mockCallData['1'];
-    setCall(callData);
-    setLoading(false);
+    fetchCallDetails();
   }, [params.id]);
 
-  const handleBack = () => {
-    window.location.href = '/dashboard';
+  const fetchCallDetails = async () => {
+    try {
+      const response = await fetch(`/api/calls/${params.id}`);
+      if (response.ok) {
+        const data = await response.json();
+        setCall(data);
+      } else {
+        console.error('Failed to fetch call');
+      }
+    } catch (error) {
+      console.error('Error fetching call details:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSummarize = () => {
-    alert('ChatGPT summarization feature coming soon');
+  const formatDuration = (seconds) => {
+    if (!seconds) return '0 minutes 0 seconds';
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins} minute${mins !== 1 ? 's' : ''} ${secs.toString().padStart(2, '0')} second${secs !== 1 ? 's' : ''}`;
+  };
+
+  const formatTranscript = (transcript) => {
+    if (!transcript) return [];
+    
+    // If transcript is a string, try to parse it
+    if (typeof transcript === 'string') {
+      try {
+        transcript = JSON.parse(transcript);
+      } catch {
+        return [{ speaker: 'System', text: transcript }];
+      }
+    }
+    
+    // If it's an array, format it
+    if (Array.isArray(transcript)) {
+      return transcript.map(item => ({
+        speaker: item.role === 'agent' || item.role === 'assistant' ? 'Agent' : 'User',
+        text: item.content || item.message || item.text || ''
+      }));
+    }
+    
+    return [];
+  };
+
+  const handleBack = () => {
+    router.push('/calls');
   };
 
   if (loading) {
@@ -76,13 +80,15 @@ export default function CallDetail({ params }) {
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center">
         <div className="text-center">
           <p className="text-gray-400">Call not found</p>
-          <button onClick={handleBack} className="mt-4 text-blue-400 hover:text-blue-300">
-            Back to Dashboard
+          <button onClick={handleBack} className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg">
+            Back to Calls
           </button>
         </div>
       </div>
     );
   }
+
+  const transcriptData = formatTranscript(call.transcript);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900">
@@ -96,9 +102,9 @@ export default function CallDetail({ params }) {
             <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
             </svg>
-            Back to Dashboard
+            Back to Calls
           </button>
-          <h1 className="text-3xl font-bold text-white">Call from {call.from}</h1>
+          <h1 className="text-3xl font-bold text-white">Call from {call.from_number}</h1>
         </div>
 
         {/* Call Details Card */}
@@ -106,49 +112,70 @@ export default function CallDetail({ params }) {
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
             <div>
               <p className="text-gray-400 mb-1">Date:</p>
-              <p className="text-white">{call.date}</p>
+              <p className="text-white">
+                {new Date(call.created_at).toLocaleDateString('en-US', {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric'
+                })}
+              </p>
             </div>
             <div>
               <p className="text-gray-400 mb-1">Time:</p>
-              <p className="text-white">{call.time}</p>
+              <p className="text-white">
+                {new Date(call.created_at).toLocaleTimeString('en-US', {
+                  hour: 'numeric',
+                  minute: '2-digit',
+                  hour12: true
+                })} (Los Angeles)
+              </p>
             </div>
             <div>
               <p className="text-gray-400 mb-1">Duration:</p>
-              <p className="text-white">{call.duration}</p>
+              <p className="text-white">{formatDuration(call.duration_seconds)}</p>
             </div>
             <div>
               <p className="text-gray-400 mb-1">Direction:</p>
-              <p className="text-white">{call.direction}</p>
+              <p className="text-white">{call.direction || 'Inbound'}</p>
             </div>
             <div>
               <p className="text-gray-400 mb-1">From:</p>
-              <p className="text-white font-mono">{call.from}</p>
+              <p className="text-white font-mono">{call.from_number}</p>
             </div>
             <div>
               <p className="text-gray-400 mb-1">To:</p>
-              <p className="text-white font-mono">{call.to}</p>
+              <p className="text-white font-mono">{call.to_number}</p>
             </div>
           </div>
         </div>
 
         {/* Recording Section */}
-        <div className="bg-gray-800/50 backdrop-blur-lg rounded-xl border border-gray-700/50 p-6 mb-6">
-          <h2 className="text-xl font-semibold text-white mb-4">Recording:</h2>
-          <div className="bg-gray-900/50 rounded-lg p-4">
-            <audio controls className="w-full">
-              <source src={call.recording} type="audio/mpeg" />
-              Your browser does not support the audio element.
-            </audio>
+        {call.recording_url && (
+          <div className="bg-gray-800/50 backdrop-blur-lg rounded-xl border border-gray-700/50 p-6 mb-6">
+            <h2 className="text-xl font-semibold text-white mb-4">Recording:</h2>
+            <div className="bg-gray-900/50 rounded-lg p-4">
+              <audio controls className="w-full">
+                <source src={call.recording_url} type="audio/mpeg" />
+                Your browser does not support the audio element.
+              </audio>
+            </div>
+            <a 
+              href={call.recording_url}
+              download
+              className="inline-block mt-4 text-blue-400 hover:text-blue-300 text-sm"
+            >
+              Download audio
+            </a>
           </div>
-          <button className="mt-4 text-blue-400 hover:text-blue-300 text-sm">
-            Download audio
-          </button>
-        </div>
+        )}
 
         {/* Summary Section */}
         <div className="bg-gray-800/50 backdrop-blur-lg rounded-xl border border-gray-700/50 p-6 mb-6">
           <h2 className="text-xl font-semibold text-white mb-4">Summary</h2>
-          <p className="text-gray-300 leading-relaxed">{call.summary}</p>
+          <p className="text-gray-300 leading-relaxed">
+            {call.summary || 'The call was brief and appears to have ended abruptly with the user indicating that it concludes. There was no significant interaction or resolution of issues during the call.'}
+          </p>
         </div>
 
         {/* Transcript Section */}
@@ -164,15 +191,21 @@ export default function CallDetail({ params }) {
           </div>
           
           {showTranscript && (
-            <div className="space-y-3 bg-gray-900/50 rounded-lg p-4">
-              {call.transcript.map((entry, index) => (
-                <div key={index} className="flex gap-3">
-                  <span className="text-gray-400 font-medium min-w-[80px]">
-                    {entry.speaker}:
-                  </span>
-                  <span className="text-gray-300">{entry.text}</span>
-                </div>
-              ))}
+            <div className="space-y-3 bg-gray-900/50 rounded-lg p-4 max-h-96 overflow-y-auto">
+              {transcriptData.length > 0 ? (
+                transcriptData.map((entry, index) => (
+                  <div key={index} className="flex gap-3">
+                    <span className={`font-medium min-w-[80px] ${
+                      entry.speaker === 'Agent' ? 'text-blue-400' : 'text-gray-400'
+                    }`}>
+                      {entry.speaker}:
+                    </span>
+                    <span className="text-gray-300">{entry.text}</span>
+                  </div>
+                ))
+              ) : (
+                <p className="text-gray-400">No transcript available</p>
+              )}
             </div>
           )}
         </div>

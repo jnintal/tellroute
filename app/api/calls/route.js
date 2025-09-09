@@ -1,7 +1,7 @@
 // app/api/calls/route.js
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { currentUser } from '@clerk/nextjs/server'; // Correct import for Clerk
+import { currentUser } from '@clerk/nextjs/server';
 
 // Initialize Supabase client
 const supabase = createClient(
@@ -15,11 +15,9 @@ export async function GET() {
     const user = await currentUser();
     const userId = user?.id;
     
-    console.log('User ID from Clerk:', userId);
     console.log('Fetching calls from Supabase...');
     
-    // For now, fetch ALL calls to test
-    // Later you can filter by userId when users are properly linked
+    // Fetch ALL calls from Supabase
     const { data: calls, error } = await supabase
       .from('calls')
       .select('*')
@@ -36,28 +34,34 @@ export async function GET() {
       });
     }
     
-    console.log(`Found ${calls?.length || 0} calls`);
+    console.log(`Found ${calls?.length || 0} calls in database`);
     
     // Format calls for the frontend
-    const recentCalls = calls?.map(call => ({
-      id: call.call_id || call.id,
-      date: new Date(call.created_at).toLocaleDateString('en-US', {
-        month: '2-digit',
-        day: '2-digit',
-        year: 'numeric'
-      }),
-      time: new Date(call.created_at).toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true
-      }),
-      duration: formatDuration(call.duration_seconds),
-      from: call.from_number,
-      to: call.to_number,
-      status: call.call_status || 'completed',
-      recording: call.recording_url,
-      summary: call.summary || 'No summary available'
-    })) || [];
+    const recentCalls = calls?.map(call => {
+      console.log('Processing call with ID:', call.call_id); // Debug log
+      
+      return {
+        id: call.call_id || call.id,
+        date: new Date(call.created_at).toLocaleDateString('en-US', {
+          month: '2-digit',
+          day: '2-digit',
+          year: 'numeric'
+        }).replace(/\//g, '-'),
+        time: new Date(call.created_at).toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
+        }).toUpperCase(),
+        duration: formatDuration(call.duration_seconds),
+        from: call.from_number,
+        to: call.to_number,
+        status: call.call_status || 'completed',
+        recording: call.recording_url,
+        summary: call.summary || call.call_summary || 'Call in progress...'
+      };
+    }) || [];
+    
+    console.log('Returning calls with IDs:', recentCalls.map(c => c.id)); // Debug log
     
     // Calculate statistics
     const totalCalls = calls?.length || 0;
@@ -68,8 +72,7 @@ export async function GET() {
       totalCalls: totalCalls,
       avgDuration: formatDuration(avgSeconds),
       missedCalls: 0,
-      recentCalls: recentCalls,
-      userId: userId // Include for debugging
+      recentCalls: recentCalls
     });
     
   } catch (error) {
