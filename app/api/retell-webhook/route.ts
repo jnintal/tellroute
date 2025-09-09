@@ -5,7 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 // Initialize Supabase client
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_KEY! // Use service key for server-side
+  process.env.SUPABASE_SERVICE_KEY!
 );
 
 export async function POST(req: NextRequest) {
@@ -38,14 +38,12 @@ export async function POST(req: NextRequest) {
       
       if (userError || !user) {
         console.error('❌ No user found for phone:', retellPhoneNumber);
-        // Still save the call but without user association (orphaned call)
-        // You can review these later
       }
       
       // Calculate duration in seconds
       const durationSeconds = call.duration_ms ? Math.round(call.duration_ms / 1000) : 0;
       
-      // Prepare call data
+      // Prepare call data - using Retell's timestamps
       const callData = {
         clerk_user_id: user?.clerk_user_id || null,
         call_id: call.call_id,
@@ -84,9 +82,6 @@ export async function POST(req: NextRequest) {
         .from('calls')
         .update({
           summary: data.call_analysis?.call_summary || data.call_analysis?.summary || null,
-          // You can add more analysis fields here if needed:
-          // user_sentiment: data.call_analysis?.user_sentiment,
-          // agent_sentiment: data.call_analysis?.agent_sentiment,
         })
         .eq('call_id', data.call_id);
       

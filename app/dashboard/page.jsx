@@ -1,4 +1,4 @@
-// app/dashboard/page.jsx - Dashboard with Clerk
+// app/dashboard/page.jsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -32,27 +32,40 @@ export default function Dashboard() {
 
   const fetchDashboardData = async () => {
     try {
-      // Fetch calls from the same API endpoint
+      // Fetch calls from the API endpoint
       const response = await fetch('/api/calls');
       if (response.ok) {
         const data = await response.json();
         console.log('Dashboard data:', data);
         
-        // Use the data structure from the API
+        // Use the data from API
         setMetrics({
           totalCalls: data.totalCalls || 0,
-          totalMinutes: Math.round((data.totalCalls * 35) / 60) || 0, // Estimate based on avg duration
+          totalMinutes: data.totalMinutes || 0,
           totalTexts: 0 // SMS not implemented yet
         });
 
-        // Format recent calls for display (take first 5)
-        const formattedCalls = data.recentCalls?.slice(0, 5).map(call => ({
-          id: call.id,
-          phoneNumber: call.from,
-          duration: call.duration,
-          time: call.time,
-          summary: call.summary || 'No summary available'
-        })) || [];
+        // Format recent calls with local timezone
+        const formattedCalls = data.recentCalls?.slice(0, 5).map(call => {
+          const callDate = new Date(call.timestamp);
+          
+          return {
+            id: call.id,
+            phoneNumber: call.from,
+            duration: call.duration,
+            time: callDate.toLocaleTimeString('en-US', {
+              hour: 'numeric',
+              minute: '2-digit',
+              hour12: true
+            }),
+            date: callDate.toLocaleDateString('en-US', {
+              month: '2-digit',
+              day: '2-digit',
+              year: 'numeric'
+            }),
+            summary: call.summary
+          };
+        }) || [];
 
         setRecentCalls(formattedCalls);
       }
@@ -152,7 +165,7 @@ export default function Dashboard() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Phone Number</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Summary</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Duration</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Time</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Date</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider"></th>
                 </tr>
               </thead>
@@ -169,7 +182,10 @@ export default function Dashboard() {
                       <span className="text-sm text-gray-300">{call.duration}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-300">{call.time}</span>
+                      <div className="text-sm text-gray-300">
+                        <div className="text-xs text-gray-500">{call.date}</div>
+                        <div>{call.time}</div>
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <button

@@ -14,19 +14,29 @@ export default function AllCalls() {
       try {
         const response = await fetch('/api/calls');
         const data = await response.json();
-        console.log('API Response:', data);
         
-        // Transform the recentCalls array - fixing date format and ensuring unique IDs
-        const formattedCalls = data.recentCalls?.map((call) => ({
-          id: call.id,
-          phoneNumber: call.from,
-          duration: call.duration,
-          date: call.date.replace(/\//g, '-'), // Convert 09/08/2025 to 09-08-2025
-          time: call.time,
-          summary: call.summary
-        })) || [];
+        // Format calls with local timezone
+        const formattedCalls = data.recentCalls?.map((call) => {
+          const callDate = new Date(call.timestamp);
+          
+          return {
+            id: call.id,
+            phoneNumber: call.from,
+            duration: call.duration,
+            date: callDate.toLocaleDateString('en-US', {
+              month: '2-digit',
+              day: '2-digit',
+              year: 'numeric'
+            }),
+            time: callDate.toLocaleTimeString('en-US', {
+              hour: 'numeric',
+              minute: '2-digit',
+              hour12: true
+            }),
+            summary: call.summary
+          };
+        }) || [];
         
-        console.log('Formatted calls:', formattedCalls);
         setCalls(formattedCalls);
         setLoading(false);
       } catch (error) {
@@ -38,14 +48,12 @@ export default function AllCalls() {
     fetchCalls();
   }, []);
 
-  // Pagination logic
   const indexOfLastCall = currentPage * callsPerPage;
   const indexOfFirstCall = indexOfLastCall - callsPerPage;
   const currentCalls = calls.slice(indexOfFirstCall, indexOfLastCall);
   const totalPages = Math.ceil(calls.length / callsPerPage);
 
   const handleViewCall = (callId) => {
-    console.log('Navigating to call:', callId);
     window.location.href = `/calls/${encodeURIComponent(callId)}`;
   };
 
@@ -72,7 +80,6 @@ export default function AllCalls() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900">
       <div className="container mx-auto px-4 py-8">
-        {/* Header */}
         <div className="mb-6">
           <button 
             onClick={handleBack}
@@ -87,7 +94,6 @@ export default function AllCalls() {
           <p className="text-gray-400">Complete call history</p>
         </div>
 
-        {/* Calls Table */}
         <div className="bg-gray-800/50 backdrop-blur-lg rounded-xl border border-gray-700/50 shadow-xl overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-700/50">
             <p className="text-sm text-gray-400">
@@ -145,7 +151,6 @@ export default function AllCalls() {
             </table>
           </div>
           
-          {/* Pagination */}
           {totalPages > 1 && (
             <div className="px-6 py-4 border-t border-gray-700/50 flex justify-between items-center">
               <button
