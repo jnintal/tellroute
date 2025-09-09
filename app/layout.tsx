@@ -28,7 +28,7 @@ export default function RootLayout({
                 <div className="flex justify-between items-center">
                   <div className="flex items-center space-x-8">
                     <Link href="/dashboard" className="text-xl font-bold text-white hover:text-gray-300 transition-colors">
-                      TellRoute
+                      Route
                     </Link>
                     <nav className="flex space-x-6">
                       <Link href="/dashboard" className="text-gray-300 hover:text-white transition-colors">
