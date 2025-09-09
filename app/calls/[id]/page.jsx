@@ -43,16 +43,31 @@ export default function CallDetail({ params }) {
     // If transcript is a string, try to parse it
     if (typeof transcript === 'string') {
       try {
+        // Try to parse as JSON first
         transcript = JSON.parse(transcript);
       } catch {
-        return [{ speaker: 'System', text: transcript }];
+        // If it's a plain text transcript, parse it by looking for Agent: and User: patterns
+        const lines = transcript.split(/(?=Agent:|User:|System:)/);
+        return lines.map(line => {
+          const trimmed = line.trim();
+          if (trimmed.startsWith('Agent:')) {
+            return { speaker: 'Agent', text: trimmed.replace('Agent:', '').trim() };
+          } else if (trimmed.startsWith('User:')) {
+            return { speaker: 'Caller', text: trimmed.replace('User:', '').trim() };
+          } else if (trimmed.startsWith('System:')) {
+            return { speaker: 'System', text: trimmed.replace('System:', '').trim() };
+          } else {
+            return { speaker: 'System', text: trimmed };
+          }
+        }).filter(item => item.text);
       }
     }
     
-    // If it's an array, format it
+    // If it's an array, format it properly
     if (Array.isArray(transcript)) {
       return transcript.map(item => ({
-        speaker: item.role === 'agent' || item.role === 'assistant' ? 'Agent' : 'User',
+        speaker: item.role === 'agent' || item.role === 'assistant' ? 'Agent' : 
+                 item.role === 'user' ? 'Caller' : 'System',
         text: item.content || item.message || item.text || ''
       }));
     }
@@ -191,16 +206,20 @@ export default function CallDetail({ params }) {
           </div>
           
           {showTranscript && (
-            <div className="space-y-3 bg-gray-900/50 rounded-lg p-4 max-h-96 overflow-y-auto">
+            <div className="space-y-4 bg-gray-900/50 rounded-lg p-6 max-h-96 overflow-y-auto">
               {transcriptData.length > 0 ? (
                 transcriptData.map((entry, index) => (
-                  <div key={index} className="flex gap-3">
-                    <span className={`font-medium min-w-[80px] ${
-                      entry.speaker === 'Agent' ? 'text-blue-400' : 'text-gray-400'
+                  <div key={index} className="flex flex-col space-y-1">
+                    <div className={`font-semibold text-sm ${
+                      entry.speaker === 'Agent' ? 'text-blue-400' : 
+                      entry.speaker === 'Caller' ? 'text-green-400' : 
+                      'text-gray-400'
                     }`}>
                       {entry.speaker}:
-                    </span>
-                    <span className="text-gray-300">{entry.text}</span>
+                    </div>
+                    <div className="text-gray-300 pl-4">
+                      {entry.text}
+                    </div>
                   </div>
                 ))
               ) : (
