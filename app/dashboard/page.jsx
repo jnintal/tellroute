@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import SyncButton from '../components/SyncButton';
+import { useSMSCount } from '../hooks/useSMSCount';
 
 export default function Dashboard() {
   const [metrics, setMetrics] = useState({
@@ -16,6 +17,9 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const { isLoaded, userId } = useAuth();
+  
+  // Add SMS count hook
+  const { monthlyTexts, loading: smsLoading, refresh: refreshSMS } = useSMSCount();
 
   useEffect(() => {
     // Wait for Clerk to load
@@ -31,6 +35,14 @@ export default function Dashboard() {
     fetchDashboardData();
   }, [isLoaded, userId]);
 
+  // Update metrics when SMS count changes
+  useEffect(() => {
+    setMetrics(prev => ({
+      ...prev,
+      totalTexts: monthlyTexts
+    }));
+  }, [monthlyTexts]);
+
   const fetchDashboardData = async () => {
     try {
       // Fetch calls from the API endpoint
@@ -43,7 +55,7 @@ export default function Dashboard() {
         setMetrics({
           totalCalls: data.totalCalls || 0,
           totalMinutes: data.totalMinutes || 0,
-          totalTexts: 0 // SMS not implemented yet
+          totalTexts: monthlyTexts // Use the SMS count from hook
         });
 
         // Format recent calls with proper UTC to local timezone conversion
@@ -86,6 +98,11 @@ export default function Dashboard() {
     }
   };
 
+  const handleSync = async () => {
+    await fetchDashboardData();
+    await refreshSMS(); // Also refresh SMS count
+  };
+
   const handleViewAllCalls = () => {
     router.push('/calls');
   };
@@ -114,7 +131,7 @@ export default function Dashboard() {
             <h1 className="text-4xl font-bold text-white mb-2">Dashboard</h1>
             <p className="text-gray-400">Welcome back! Here's your activity overview.</p>
           </div>
-          <SyncButton onSync={fetchDashboardData} />
+          <SyncButton onSync={handleSync} />
         </div>
 
         {/* Metrics Grid */}
@@ -154,7 +171,9 @@ export default function Dashboard() {
               </div>
               <span className="text-xs text-gray-400">This month</span>
             </div>
-            <div className="text-3xl font-bold text-white mb-1">{metrics.totalTexts.toLocaleString()}</div>
+            <div className="text-3xl font-bold text-white mb-1">
+              {smsLoading ? '...' : metrics.totalTexts.toLocaleString()}
+            </div>
             <div className="text-sm text-gray-400">Total Texts</div>
           </div>
         </div>
