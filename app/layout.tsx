@@ -1,7 +1,9 @@
+// app/layout.tsx
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { ClerkProvider } from "@clerk/nextjs";
+import { ClerkProvider, UserButton, SignedIn, SignedOut } from "@clerk/nextjs";
+import Link from "next/link";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -18,7 +20,40 @@ export default function RootLayout({
   return (
     <ClerkProvider>
       <html lang="en">
-        <body className={inter.className}>{children}</body>
+        <body className={inter.className}>
+          <SignedIn>
+            <header className="bg-gray-900/50 backdrop-blur-lg border-b border-gray-800">
+              <div className="container mx-auto px-4 py-4">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center space-x-8">
+                    <Link href="/dashboard" className="text-xl font-bold text-white hover:text-gray-300 transition-colors">
+                      TellRoute
+                    </Link>
+                    <nav className="flex space-x-6">
+                      <Link href="/dashboard" className="text-gray-300 hover:text-white transition-colors">
+                        Dashboard
+                      </Link>
+                      <Link href="/calls" className="text-gray-300 hover:text-white transition-colors">
+                        All Calls
+                      </Link>
+                    </nav>
+                  </div>
+                  <div className="flex items-center space-x-4">
+                    <UserButton 
+                      afterSignOutUrl="/sign-in"
+                      appearance={{
+                        elements: {
+                          avatarBox: "h-8 w-8"
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </header>
+          </SignedIn>
+          {children}
+        </body>
       </html>
     </ClerkProvider>
   );
