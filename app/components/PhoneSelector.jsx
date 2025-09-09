@@ -12,18 +12,17 @@ export default function PhoneSelector() {
   const { userId } = useAuth();
 
   useEffect(() => {
-    // For now, use mock data. Later this will fetch from your database
-    const mockPhones = [
-      { id: 1, number: '+12133548232' },
-      { id: 2, number: '+13103619496' },
-      // Add more numbers as needed
+    // For production - this user only has one number
+    // Later this will fetch from your database based on the user's email/ID
+    const userPhones = [
+      { id: 1, number: '+12133548232' }
     ];
     
-    setPhoneNumbers(mockPhones);
+    setPhoneNumbers(userPhones);
     // Set default selected phone
-    if (mockPhones.length > 0) {
-      setSelectedPhone(mockPhones[0].number);
-      localStorage.setItem('selectedPhone', mockPhones[0].number);
+    if (userPhones.length > 0) {
+      setSelectedPhone(userPhones[0].number);
+      localStorage.setItem('selectedPhone', userPhones[0].number);
     }
   }, [userId]);
 
@@ -43,7 +42,6 @@ export default function PhoneSelector() {
     setSelectedPhone(phone.number);
     localStorage.setItem('selectedPhone', phone.number);
     setIsOpen(false);
-    // You can add logic here to reload data for the selected phone
     window.location.reload();
   };
 
@@ -62,6 +60,19 @@ export default function PhoneSelector() {
 
   const currentPhone = phoneNumbers.find(p => p.number === selectedPhone) || phoneNumbers[0];
 
+  // If only one phone number, just display it without dropdown
+  if (phoneNumbers.length === 1) {
+    return (
+      <div className="flex items-center space-x-2 px-3 py-1.5 text-sm text-gray-300">
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+        </svg>
+        <span className="font-mono text-white">{formatPhoneNumber(currentPhone.number)}</span>
+      </div>
+    );
+  }
+
+  // Multiple phone numbers - show dropdown
   return (
     <div className="relative" ref={dropdownRef}>
       <button
