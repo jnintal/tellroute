@@ -4,6 +4,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { ClerkProvider, UserButton, SignedIn, SignedOut } from "@clerk/nextjs";
 import Link from "next/link";
+import PhoneSelector from "./components/PhoneSelector";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -39,6 +40,7 @@ export default function RootLayout({
                     </nav>
                   </div>
                   <div className="flex items-center space-x-4">
+                    <PhoneSelector />
                     <UserButton 
                       afterSignOutUrl="/sign-in"
                       appearance={{
