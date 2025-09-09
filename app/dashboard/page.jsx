@@ -32,35 +32,29 @@ export default function Dashboard() {
 
   const fetchDashboardData = async () => {
     try {
-      // Fetch real calls from API
-      const response = await fetch('/api/calls?limit=5');
+      // Fetch calls from the same API endpoint
+      const response = await fetch('/api/calls');
       if (response.ok) {
         const data = await response.json();
+        console.log('Dashboard data:', data);
         
-        // Calculate metrics from real data
-        const totalCalls = data.total || 0;
-        const totalMinutes = data.calls.reduce((sum, call) => {
-          return sum + (call.duration || 0);
-        }, 0);
-        
+        // Use the data structure from the API
         setMetrics({
-          totalCalls: totalCalls,
-          totalMinutes: Math.floor(totalMinutes / 60), // Convert seconds to minutes
+          totalCalls: data.totalCalls || 0,
+          totalMinutes: Math.round((data.totalCalls * 35) / 60) || 0, // Estimate based on avg duration
           totalTexts: 0 // SMS not implemented yet
         });
 
-        // Format recent calls for display
-        setRecentCalls(data.calls.slice(0, 5).map(call => ({
-          id: call.call_id,
-          phoneNumber: formatPhoneNumber(call.from_number),
-          duration: formatDuration(call.duration),
-          time: new Date(call.created_at).toLocaleTimeString('en-US', { 
-            hour: '2-digit', 
-            minute: '2-digit',
-            hour12: true
-          }),
-          summary: getSummaryFromTranscript(call.transcript)
-        })));
+        // Format recent calls for display (take first 5)
+        const formattedCalls = data.recentCalls?.slice(0, 5).map(call => ({
+          id: call.id,
+          phoneNumber: call.from,
+          duration: call.duration,
+          time: call.time,
+          summary: call.summary || 'No summary available'
+        })) || [];
+
+        setRecentCalls(formattedCalls);
       }
       
       setLoading(false);
@@ -68,42 +62,6 @@ export default function Dashboard() {
       console.error('Error fetching dashboard data:', error);
       setLoading(false);
     }
-  };
-
-  const formatPhoneNumber = (phone) => {
-    if (!phone) return 'Unknown';
-    const cleaned = phone.replace(/\D/g, '');
-    if (cleaned.length === 10) {
-      return `+1 (${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
-    }
-    return phone;
-  };
-
-  const formatDuration = (seconds) => {
-    if (!seconds) return '00:00';
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-  };
-
-  const getSummaryFromTranscript = (transcript) => {
-    if (!transcript || transcript.length === 0) return 'No transcript available';
-    
-    if (typeof transcript === 'string') {
-      try {
-        transcript = JSON.parse(transcript);
-      } catch {
-        return transcript.substring(0, 100);
-      }
-    }
-
-    const firstUserMessage = transcript.find(t => t.role === 'user');
-    if (firstUserMessage) {
-      const content = firstUserMessage.content || firstUserMessage.message || '';
-      return content.substring(0, 100) + (content.length > 100 ? '...' : '');
-    }
-
-    return 'Brief conversation';
   };
 
   const handleViewAllCalls = () => {
