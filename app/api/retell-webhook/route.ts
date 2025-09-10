@@ -12,10 +12,10 @@ export async function POST(req: NextRequest) {
     
     console.log('Webhook received:', JSON.stringify(data, null, 2));
 
-    // Check if this is an SMS request (has 'body' field from custom function)
-    if (data.body && !data.event && !data.call) {
-      console.log('SMS request detected - body field found');
-      console.log('Message to send:', data.body);
+    // Check if this is an SMS request from Retell (has 'name' and 'args')
+    if (data.name === 'send_text' && data.args) {
+      console.log('SMS request detected - send_text function called');
+      console.log('Message to send:', data.args.body);
       
       // Get the most recent call from the last 10 minutes
       const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
@@ -47,11 +47,11 @@ export async function POST(req: NextRequest) {
         
         console.log('Cleaned phone number:', cleanedNumber);
         
-        // Call the send-text endpoint DIRECTLY using fetch
+        // Call the send-text endpoint
         const smsPayload = {
-          body: data.body,
+          body: data.args.body,
           to: cleanedNumber,
-          key: process.env.SECRET_KEY || 'your_secret_key' // Use actual key or fallback
+          key: process.env.SECRET_KEY || 'your_secret_key'
         };
         
         console.log('Calling /api/send-text with:', smsPayload);
@@ -71,11 +71,11 @@ export async function POST(req: NextRequest) {
           return Response.json({ success: true });
         } else {
           console.error('SMS API failed:', result);
-          return Response.json({ error: 'Failed to send SMS', details: result }, { status: 500 });
+          return Response.json({ success: false, error: 'Failed to send SMS' });
         }
       } else {
         console.error('No phone number in recent call');
-        return Response.json({ error: 'No phone number found' }, { status: 400 });
+        return Response.json({ success: false, error: 'No phone number found' });
       }
     }
 
