@@ -15,7 +15,6 @@ export async function POST(req: NextRequest) {
 
     // Handle different event types from Retell
     if (data.event === 'tool_calls' && data.tool_calls) {
-      // Handle tool calls during the call
       for (const toolCall of data.tool_calls) {
         if (toolCall.function_name === 'send_text') {
           const result = await handleSendText(
@@ -32,7 +31,6 @@ export async function POST(req: NextRequest) {
     if (data.tool_call_id && data.tool_call) {
       const toolCall = data.tool_call;
       if (toolCall.function_name === 'send_text') {
-        // Extract the actual phone number from the call
         const phoneNumber = data.from_number || data.customer_number || data.phone_number;
         const messageBody = toolCall.arguments?.body || 
           "Order Pallets from Pallet Company Pro at https://palletcompanypro.com/";
@@ -46,7 +44,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Default response for other events
     return Response.json({ success: true });
   } catch (error) {
     console.error('Webhook error:', error);
@@ -61,23 +58,20 @@ async function handleSendText(callId: string, toNumber: string, messageBody: str
   try {
     console.log('Sending SMS:', { callId, toNumber, messageBody });
     
-    // Make sure we have a phone number
     if (!toNumber || toNumber === 'your_phone_number') {
       console.error('No valid phone number provided');
       return { error: 'No phone number provided' };
     }
 
-    // Clean the phone number
     let cleanedNumber = toNumber.replace(/[^\d+]/g, '');
     if (!cleanedNumber.startsWith('+')) {
       cleanedNumber = '+1' + cleanedNumber;
     }
 
-    // Use the message body from the agent or default
     const finalMessage = messageBody || 
       "Order Pallets from Pallet Company Pro at https://palletcompanypro.com/";
 
-    // First, record in database
+    // Record in database
     await supabase
       .from('sms_queue')
       .insert({
@@ -89,20 +83,21 @@ async function handleSendText(callId: string, toNumber: string, messageBody: str
         created_at: new Date().toISOString()
       });
 
-    // Now send the SMS via your existing endpoint
+    // Send SMS via your endpoint
     const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/send-text`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         body: finalMessage,
         to: cleanedNumber,
-        key: process.env.SECRET_KEY // Use the actual secret key from env
+        key: process.env.SECRET_KEY
       })
     });
 
     const result = await response.json();
     
-    if (response.ok && result.ok) {
+    // FIX: Check for both 'ok' and 'success' in response
+    if (response.ok && (result.ok || result.success)) {
       // Mark as sent in database
       await supabase
         .from('sms_queue')
@@ -111,7 +106,7 @@ async function handleSendText(callId: string, toNumber: string, messageBody: str
         .order('created_at', { ascending: false })
         .limit(1);
       
-      console.log('SMS sent successfully:', result.sid);
+      console.log('SMS sent successfully:', result.sid || result);
       return { success: true, sid: result.sid };
     } else {
       console.error('Failed to send SMS:', result);
