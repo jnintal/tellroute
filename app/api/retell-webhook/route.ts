@@ -11,12 +11,11 @@ export async function POST(req: NextRequest) {
     const data = await req.json();
     
     console.log('Webhook received:', JSON.stringify(data, null, 2));
-    console.log('Headers:', Object.fromEntries(req.headers.entries()));
 
-    // Check if this is an SMS request - look for 'body' field in the data
-    // This happens when custom function is called
+    // Check if this is an SMS request (has 'body' field from custom function)
     if (data.body && !data.event && !data.call) {
       console.log('SMS request detected - body field found');
+      console.log('Message to send:', data.body);
       
       // Get the most recent call from the last 10 minutes
       const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
@@ -29,88 +28,72 @@ export async function POST(req: NextRequest) {
         .single();
       
       if (error) {
-        console.error('Error fetching recent call:', error);
+        console.error('Database error:', error);
         return Response.json({ error: 'Could not find recent call' }, { status: 400 });
       }
       
+      console.log('Recent call found:', {
+        call_id: recentCall?.call_id,
+        from: recentCall?.from_number,
+        to: recentCall?.to_number
+      });
+      
       if (recentCall && recentCall.from_number) {
-        console.log('Found recent call:', {
-          call_id: recentCall.call_id,
-          from: recentCall.from_number,
-          to: recentCall.to_number
-        });
-        
         // Clean the phone number
         let cleanedNumber = recentCall.from_number.replace(/[^\d+]/g, '');
         if (!cleanedNumber.startsWith('+')) {
           cleanedNumber = '+1' + cleanedNumber.replace(/^1/, '');
         }
         
-        console.log('Preparing to send SMS to:', cleanedNumber);
-        console.log('Message:', data.body);
+        console.log('Cleaned phone number:', cleanedNumber);
         
-        // Record in database FIRST
-        const { error: insertError } = await supabase.from('sms_queue').insert({
-          call_id: recentCall.call_id,
-          to_number: cleanedNumber,
-          message: data.body,
-          consent_given: true,
-          sent: false,
-          created_at: new Date().toISOString()
-        });
+        // Call the send-text endpoint DIRECTLY using fetch
+        const smsPayload = {
+          body: data.body,
+          to: cleanedNumber,
+          key: process.env.SECRET_KEY || 'your_secret_key' // Use actual key or fallback
+        };
         
-        if (insertError) {
-          console.error('Error inserting to sms_queue:', insertError);
-        }
+        console.log('Calling /api/send-text with:', smsPayload);
         
-        // Send SMS via Twilio
-        console.log('Calling send-text API...');
-        const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/send-text`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'https://www.tellroute.com'}/api/send-text`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            body: data.body,
-            to: cleanedNumber,
-            key: process.env.SECRET_KEY
-          })
+          body: JSON.stringify(smsPayload)
         });
         
-        const result = await response.json();
-        console.log('Twilio API response:', result);
+        const result = await response.text();
+        console.log('SMS API Response Status:', response.status);
+        console.log('SMS API Response Body:', result);
         
-        if (response.ok && (result.ok || result.success)) {
-          await supabase
-            .from('sms_queue')
-            .update({ sent: true })
-            .eq('call_id', recentCall.call_id);
-          
+        if (response.ok) {
           console.log('SMS sent successfully!');
           return Response.json({ success: true });
         } else {
-          console.error('Twilio API error:', result);
+          console.error('SMS API failed:', result);
           return Response.json({ error: 'Failed to send SMS', details: result }, { status: 500 });
         }
       } else {
-        console.error('No recent call found');
-        return Response.json({ error: 'No active call found' }, { status: 400 });
+        console.error('No phone number in recent call');
+        return Response.json({ error: 'No phone number found' }, { status: 400 });
       }
     }
 
     // Handle regular Retell events
     if (data.event === 'call_inbound' || data.event === 'call_started') {
       console.log('Call started - storing in database');
-      const callData = data.call || data;
+      const callData = data.call || data.call_inbound || data;
       
       await supabase.from('calls').upsert({
-        call_id: callData.call_id,
-        from_number: callData.from_number || data.from_phone_number,
-        to_number: callData.to_number || data.to_phone_number,
+        call_id: callData.call_id || `temp_${Date.now()}`,
+        from_number: callData.from_number,
+        to_number: callData.to_number,
         status: 'started',
         created_at: new Date().toISOString()
       });
     }
 
-    if (data.event === 'call_ended' || data.event === 'call_analyzed') {
+    if (data.event === 'call_ended') {
       console.log('Call ended');
       const callData = data.call || data;
       
