@@ -12,27 +12,44 @@ export async function POST(req: NextRequest) {
     
     console.log('Webhook received:', JSON.stringify(data, null, 2));
 
-    // HANDLE DIRECT CUSTOM FUNCTION CALLS
-    // If the request has 'body' directly, it's from the custom function
-    if (data.body && !data.event) {
-      console.log('Direct custom function call detected');
+    // Handle Retell webhook events
+    if (data.event === 'tool_calls' && data.tool_calls) {
+      console.log('Tool calls event detected');
       
-      // Get caller info from headers or use a default
-      const callerId = req.headers.get('x-call-id') || 'direct-' + Date.now();
-      const fromNumber = req.headers.get('x-from-number') || '+19299690588'; // Your test number
-      
-      const result = await handleSendText(
-        callerId,
-        fromNumber,
-        data.body
+      // Find the send_text function call
+      const sendTextCall = data.tool_calls.find((call: any) => 
+        call.function_name === 'send_text'
       );
       
-      return Response.json(result);
+      if (sendTextCall) {
+        // Extract the actual phone numbers from the call data
+        const callerNumber = data.from_phone_number; // Who called (recipient of SMS)
+        const retellNumber = data.to_phone_number;   // Which Retell number was called
+        const callId = data.call_id;
+        
+        console.log('SMS Request:', {
+          callId,
+          callerNumber,
+          retellNumber,
+          message: sendTextCall.arguments.body
+        });
+        
+        // Send the SMS
+        const result = await handleSendText(
+          callId,
+          callerNumber,
+          retellNumber,
+          sendTextCall.arguments.body
+        );
+        
+        return Response.json(result);
+      }
     }
 
-    // Handle normal Retell webhook events
+    // Handle other events (call_started, call_ended, etc.)
     if (data.event === 'call_ended') {
       console.log('Call ended:', data.call_id);
+      // You can store call data here if needed
     }
 
     return Response.json({ success: true });
@@ -45,10 +62,16 @@ export async function POST(req: NextRequest) {
   }
 }
 
-async function handleSendText(callId: string, toNumber: string, messageBody: string) {
+async function handleSendText(
+  callId: string, 
+  toNumber: string, 
+  retellNumber: string,
+  messageBody: string
+) {
   try {
-    console.log('Sending SMS:', { callId, toNumber, messageBody });
+    console.log('Sending SMS:', { callId, toNumber, retellNumber, messageBody });
 
+    // Clean phone number
     let cleanedNumber = toNumber.replace(/[^\d+]/g, '');
     if (!cleanedNumber.startsWith('+')) {
       cleanedNumber = '+1' + cleanedNumber;
@@ -57,19 +80,27 @@ async function handleSendText(callId: string, toNumber: string, messageBody: str
     const finalMessage = messageBody || 
       "Order Pallets from Pallet Company Pro at https://palletcompanypro.com/";
 
+    // Find which customer owns this Retell number
+    const { data: customer } = await supabase
+      .from('users')
+      .select('clerk_user_id')
+      .eq('retell_phone_number', retellNumber)
+      .single();
+
     // Record in database
     await supabase
       .from('sms_queue')
       .insert({
         call_id: callId,
-        to_number: cleanedNumber,  
+        clerk_user_id: customer?.clerk_user_id || null,
+        to_number: cleanedNumber,
         message: finalMessage,
         consent_given: true,
         sent: false,
         created_at: new Date().toISOString()
       });
 
-    // Send SMS via your endpoint
+    // Send SMS via your Twilio endpoint
     const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/send-text`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -83,19 +114,20 @@ async function handleSendText(callId: string, toNumber: string, messageBody: str
     const result = await response.json();
     
     if (response.ok && (result.ok || result.success)) {
+      // Update database to mark as sent
       await supabase
         .from('sms_queue')
         .update({ sent: true })
         .eq('call_id', callId);
       
       console.log('SMS sent successfully');
-      return { success: true };
+      return { success: true, message: "SMS sent successfully" };
     } else {
       console.error('Failed to send SMS:', result);
-      return { error: 'Failed to send SMS' };
+      return { success: false, error: 'Failed to send SMS' };
     }
   } catch (error) {
     console.error('Error in handleSendText:', error);
-    return { error: 'Failed to send SMS' };
+    return { success: false, error: 'Failed to send SMS' };
   }
 }
