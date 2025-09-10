@@ -11,12 +11,14 @@ export async function POST(req: NextRequest) {
     const data = await req.json();
     
     console.log('Webhook received:', JSON.stringify(data, null, 2));
+    console.log('Headers:', Object.fromEntries(req.headers.entries()));
 
-    // Handle SMS requests (when only 'body' is present)
-    if (data.body && !data.event) {
-      console.log('SMS request detected - looking up recent call');
+    // Check if this is an SMS request - look for 'body' field in the data
+    // This happens when custom function is called
+    if (data.body && !data.event && !data.call) {
+      console.log('SMS request detected - body field found');
       
-      // Get the most recent call (within last 10 minutes)
+      // Get the most recent call from the last 10 minutes
       const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
       const { data: recentCall, error } = await supabase
         .from('calls')
@@ -44,10 +46,11 @@ export async function POST(req: NextRequest) {
           cleanedNumber = '+1' + cleanedNumber.replace(/^1/, '');
         }
         
-        console.log('Sending SMS to:', cleanedNumber);
+        console.log('Preparing to send SMS to:', cleanedNumber);
+        console.log('Message:', data.body);
         
-        // Record in database
-        await supabase.from('sms_queue').insert({
+        // Record in database FIRST
+        const { error: insertError } = await supabase.from('sms_queue').insert({
           call_id: recentCall.call_id,
           to_number: cleanedNumber,
           message: data.body,
@@ -56,7 +59,12 @@ export async function POST(req: NextRequest) {
           created_at: new Date().toISOString()
         });
         
+        if (insertError) {
+          console.error('Error inserting to sms_queue:', insertError);
+        }
+        
         // Send SMS via Twilio
+        console.log('Calling send-text API...');
         const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/send-text`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -68,52 +76,57 @@ export async function POST(req: NextRequest) {
         });
         
         const result = await response.json();
-        console.log('Twilio response:', result);
+        console.log('Twilio API response:', result);
         
-        if (response.ok) {
+        if (response.ok && (result.ok || result.success)) {
           await supabase
             .from('sms_queue')
             .update({ sent: true })
             .eq('call_id', recentCall.call_id);
           
+          console.log('SMS sent successfully!');
           return Response.json({ success: true });
         } else {
-          console.error('Twilio error:', result);
-          return Response.json({ error: 'Failed to send SMS' }, { status: 500 });
+          console.error('Twilio API error:', result);
+          return Response.json({ error: 'Failed to send SMS', details: result }, { status: 500 });
         }
       } else {
-        console.error('No recent call found with phone numbers');
+        console.error('No recent call found');
         return Response.json({ error: 'No active call found' }, { status: 400 });
       }
     }
 
     // Handle regular Retell events
-    if (data.event === 'call_started') {
+    if (data.event === 'call_inbound' || data.event === 'call_started') {
       console.log('Call started - storing in database');
-      await supabase.from('calls').insert({
-        call_id: data.call_id,
-        from_number: data.from_phone_number,
-        to_number: data.to_phone_number,
+      const callData = data.call || data;
+      
+      await supabase.from('calls').upsert({
+        call_id: callData.call_id,
+        from_number: callData.from_number || data.from_phone_number,
+        to_number: callData.to_number || data.to_phone_number,
         status: 'started',
         created_at: new Date().toISOString()
       });
     }
 
-    if (data.event === 'call_ended') {
-      console.log('Call ended:', data.call_id);
+    if (data.event === 'call_ended' || data.event === 'call_analyzed') {
+      console.log('Call ended');
+      const callData = data.call || data;
+      
       await supabase
         .from('calls')
         .update({ 
           status: 'ended',
-          duration: data.duration,
+          duration: callData.duration_ms,
           ended_at: new Date().toISOString()
         })
-        .eq('call_id', data.call_id);
+        .eq('call_id', callData.call_id);
     }
 
     return Response.json({ success: true });
   } catch (error) {
     console.error('Webhook error:', error);
-    return Response.json({ error: 'Server error' }, { status: 500 });
+    return Response.json({ error: 'Server error', details: error }, { status: 500 });
   }
 }
