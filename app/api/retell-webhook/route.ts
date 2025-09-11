@@ -89,14 +89,20 @@ export async function POST(req: NextRequest) {
       const durationSeconds = Math.floor(durationMs / 1000);
       
       // Update call with complete analysis data
+      // Extract call_summary from either location based on Retell's format
+      const callSummary = call.call_analysis?.call_summary || 
+                         call.call_summary || 
+                         call.summary || 
+                         '';
+      
       const { error } = await supabase
         .from('calls')
         .update({
           status: 'completed',
           duration: durationSeconds,
           duration_seconds: durationSeconds,
-          summary: call.call_analysis?.call_summary || call.summary || '',
-          transcript: call.call_analysis?.transcript || call.transcript || {},
+          summary: callSummary,
+          transcript: call.transcript || call.call_analysis?.transcript || {},
           recording_url: call.recording_url || call.recording || '',
           end_timestamp: call.end_timestamp || Date.now(),
           ended_at: new Date(call.end_timestamp || Date.now()).toISOString(),
