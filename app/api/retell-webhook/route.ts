@@ -170,13 +170,18 @@ export async function POST(req: NextRequest) {
         });
         
         // Send SMS via your endpoint
+        if (!process.env.SECRET_KEY) {
+          console.error('SECRET_KEY not configured');
+          return Response.json({ success: false, error: 'Server configuration error' });
+        }
+        
         const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'https://www.tellroute.com'}/api/send-text`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             body: data.args.body,
             to: cleanedNumber,
-            key: process.env.SECRET_KEY || 'your_secret_key'
+            key: process.env.SECRET_KEY
           })
         });
         

@@ -7,13 +7,22 @@ export async function POST(req: NextRequest) {
     
     if (!body) return Response.json({ error: 'Missing "body"' }, { status: 400 });
     
-    // Check if this is from your own webhook (internal call) OR has the placeholder key
+    // Check if this is from your own webhook (internal call)
     const referer = req.headers.get('referer');
-    const isInternalCall = referer?.includes('tellroute.com');
+    const host = req.headers.get('host');
+    const isInternalCall = referer?.includes('tellroute.com') || host?.includes('tellroute.com');
     
-    // Allow internal calls, placeholder key from Retell, OR correct secret key
-    if (!isInternalCall && key !== process.env.SECRET_KEY && key !== 'your_secret_key') {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    // Validate authentication
+    if (!isInternalCall) {
+      // External calls must have valid secret key
+      if (!process.env.SECRET_KEY) {
+        console.error('SECRET_KEY not configured');
+        return Response.json({ error: 'Server configuration error' }, { status: 500 });
+      }
+      
+      if (key !== process.env.SECRET_KEY) {
+        return Response.json({ error: 'Unauthorized' }, { status: 401 });
+      }
     }
     
     // Get Twilio credentials from environment variables
