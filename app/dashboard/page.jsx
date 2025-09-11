@@ -4,7 +4,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
-import SyncButton from '../components/SyncButton';
 import { useSMSCount } from '../hooks/useSMSCount';
 
 export default function Dashboard() {
@@ -98,11 +97,6 @@ export default function Dashboard() {
     }
   };
 
-  const handleSync = async () => {
-    await fetchDashboardData();
-    await refreshSMS(); // Also refresh SMS count
-  };
-
   const handleViewAllCalls = () => {
     router.push('/calls');
   };
@@ -126,12 +120,9 @@ export default function Dashboard() {
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-4xl font-bold text-white mb-2">Dashboard</h1>
-            <p className="text-gray-400">Welcome back! Here's your activity overview.</p>
-          </div>
-          <SyncButton onSync={handleSync} />
+        <div className="mb-8">
+          <h1 className="text-4xl font-bold text-white mb-2">Dashboard</h1>
+          <p className="text-gray-400">Welcome back! Here's your activity overview.</p>
         </div>
 
         {/* Metrics Grid */}
