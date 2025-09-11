@@ -163,13 +163,29 @@ export default function Home() {
       {/* Footer */}
       <footer className="relative z-10 mt-32 border-t border-gray-800">
         <div className="max-w-7xl mx-auto px-6 py-12">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-6">
             <div>
               <div className="text-xl font-bold mb-2">Route</div>
               <p className="text-gray-400">AI Voice Assistant for Modern Businesses</p>
             </div>
-            <div className="text-gray-400">
-              © 2025 The Route AI Limited Liability Company. All rights reserved.
+            <div className="flex flex-col items-center md:items-end gap-4">
+              <div className="flex gap-6">
+                <a href="/legal/terms-and-conditions.pdf" 
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   className="text-gray-400 hover:text-white transition-colors">
+                  Terms & Conditions
+                </a>
+                <a href="/legal/privacy-policy.pdf" 
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   className="text-gray-400 hover:text-white transition-colors">
+                  Privacy Policy
+                </a>
+              </div>
+              <div className="text-gray-400 text-sm">
+                © 2025 The Route AI Limited Liability Company. All rights reserved.
+              </div>
             </div>
           </div>
         </div>
