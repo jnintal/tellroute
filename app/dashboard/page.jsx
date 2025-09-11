@@ -4,7 +4,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
-import { useSMSCount } from '../hooks/useSMSCount';
 
 export default function Dashboard() {
   const [metrics, setMetrics] = useState({
@@ -14,11 +13,9 @@ export default function Dashboard() {
   });
   const [recentCalls, setRecentCalls] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [smsLoading, setSmsLoading] = useState(true);
   const router = useRouter();
   const { isLoaded, userId } = useAuth();
-  
-  // Add SMS count hook
-  const { monthlyTexts, loading: smsLoading, refresh: refreshSMS } = useSMSCount();
 
   useEffect(() => {
     // Wait for Clerk to load
@@ -32,15 +29,8 @@ export default function Dashboard() {
 
     // Fetch dashboard data
     fetchDashboardData();
+    fetchSMSData();
   }, [isLoaded, userId]);
-
-  // Update metrics when SMS count changes
-  useEffect(() => {
-    setMetrics(prev => ({
-      ...prev,
-      totalTexts: monthlyTexts
-    }));
-  }, [monthlyTexts]);
 
   const fetchDashboardData = async () => {
     try {
@@ -51,11 +41,11 @@ export default function Dashboard() {
         console.log('Dashboard data:', data);
         
         // Use the data from API
-        setMetrics({
+        setMetrics(prev => ({
+          ...prev,
           totalCalls: data.totalCalls || 0,
-          totalMinutes: data.totalMinutes || 0,
-          totalTexts: monthlyTexts // Use the SMS count from hook
-        });
+          totalMinutes: data.totalMinutes || 0
+        }));
 
         // Format recent calls with proper UTC to local timezone conversion
         const formattedCalls = data.recentCalls?.slice(0, 5).map(call => {
@@ -94,6 +84,26 @@ export default function Dashboard() {
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
       setLoading(false);
+    }
+  };
+
+  const fetchSMSData = async () => {
+    try {
+      setSmsLoading(true);
+      const response = await fetch('/api/sms/count');
+      if (response.ok) {
+        const data = await response.json();
+        console.log('SMS data:', data);
+        
+        setMetrics(prev => ({
+          ...prev,
+          totalTexts: data.monthlyTexts || 0
+        }));
+      }
+      setSmsLoading(false);
+    } catch (error) {
+      console.error('Error fetching SMS data:', error);
+      setSmsLoading(false);
     }
   };
 
