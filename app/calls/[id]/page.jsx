@@ -128,22 +128,40 @@ export default function CallDetail({ params }) {
             <div>
               <p className="text-gray-400 mb-1">Date:</p>
               <p className="text-white">
-                {new Date(call.created_at).toLocaleDateString('en-US', {
-                  weekday: 'long',
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric'
-                })}
+                {(() => {
+                  let timestamp = call.created_at;
+                  // Ensure timestamp has timezone info
+                  if (!timestamp.endsWith('Z') && !timestamp.includes('+') && !timestamp.includes('T')) {
+                    timestamp = timestamp + 'Z';
+                  } else if (timestamp.includes('T') && !timestamp.endsWith('Z') && !timestamp.includes('+')) {
+                    timestamp = timestamp + 'Z';
+                  }
+                  return new Date(timestamp).toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                  });
+                })()}
               </p>
             </div>
             <div>
               <p className="text-gray-400 mb-1">Time:</p>
               <p className="text-white">
-                {new Date(call.created_at).toLocaleTimeString('en-US', {
-                  hour: 'numeric',
-                  minute: '2-digit',
-                  hour12: true
-                })}
+                {(() => {
+                  let timestamp = call.created_at;
+                  // Ensure timestamp has timezone info
+                  if (!timestamp.endsWith('Z') && !timestamp.includes('+') && !timestamp.includes('T')) {
+                    timestamp = timestamp + 'Z';
+                  } else if (timestamp.includes('T') && !timestamp.endsWith('Z') && !timestamp.includes('+')) {
+                    timestamp = timestamp + 'Z';
+                  }
+                  return new Date(timestamp).toLocaleTimeString('en-US', {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true
+                  });
+                })()}
               </p>
             </div>
             <div>
