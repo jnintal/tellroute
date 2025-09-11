@@ -208,7 +208,7 @@ export default function Dashboard() {
                       <span className="text-sm font-mono text-gray-300">{call.phoneNumber}</span>
                     </td>
                     <td className="px-6 py-4">
-                      <p className="text-sm text-gray-300 line-clamp-1 max-w-md">{call.summary}</p>
+                      <p className="text-sm text-gray-300 line-clamp-2 max-w-xl">{call.summary}</p>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className="text-sm text-gray-300">{call.duration}</span>
