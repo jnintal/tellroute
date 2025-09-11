@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
 
 export default function TermsPage() {
-  redirect('/terms.pdf');
+  redirect('/legal/terms-and-conditions.pdf');
 }
