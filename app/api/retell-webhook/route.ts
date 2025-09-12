@@ -116,6 +116,39 @@ export async function POST(req: NextRequest) {
         console.log('Call analyzed - stored summary, transcript, and recording');
       }
       
+      // Send summary SMS to +13237747279
+      if (callSummary && call.from_number) {
+        try {
+          // Format the SMS message
+          const smsMessage = `Call from ${call.from_number || call.from_phone_number}: ${callSummary}`;
+          
+          console.log('Sending call summary SMS to +13237747279');
+          
+          // Send SMS via the send-text endpoint
+          if (process.env.SECRET_KEY) {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'https://www.tellroute.com'}/api/send-text`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                body: smsMessage,
+                to: '+13237747279',
+                key: process.env.SECRET_KEY
+              })
+            });
+            
+            if (response.ok) {
+              console.log('Summary SMS sent successfully to +13237747279');
+            } else {
+              console.error('Failed to send summary SMS');
+            }
+          } else {
+            console.error('SECRET_KEY not configured for summary SMS');
+          }
+        } catch (smsError) {
+          console.error('Error sending summary SMS:', smsError);
+        }
+      }
+      
       return Response.json({ success: true });
     }
 
