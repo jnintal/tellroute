@@ -116,13 +116,14 @@ export async function POST(req: NextRequest) {
         console.log('Call analyzed - stored summary, transcript, and recording');
       }
       
-      // Send summary SMS to +13237747279
-      if (callSummary && call.from_number) {
+      // Send summary SMS to +13237747279 only for calls to +12133548232
+      const toNumber = call.to_number || call.to_phone_number;
+      if (callSummary && call.from_number && toNumber === '+12133548232') {
         try {
           // Format the SMS message
           const smsMessage = `Call from ${call.from_number || call.from_phone_number}: ${callSummary}`;
           
-          console.log('Sending call summary SMS to +13237747279');
+          console.log('Sending call summary SMS to +13237747279 for call to +12133548232');
           
           // Send SMS via the send-text endpoint
           if (process.env.SECRET_KEY) {
